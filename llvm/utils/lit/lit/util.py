@@ -232,16 +232,24 @@ def which(command, paths=None):
     # Get suffixes to search.
     # On Cygwin, 'PATHEXT' may exist but it should not be used.
     if os.pathsep == ';':
-        pathext = os.environ.get('PATHEXT', '').split(';')
+        # Since this branch implies windows, it's safe to convert all extensions to lowercase.
+        assert(sys.platform == 'win32')
+        pathext = [x.lower() for x in os.environ.get('PATHEXT', '').split(';')]
+
+        # If the path was given to us with an extension already, ignore PATHEXT
+        _, current_ext = os.path.splitext(command)
+        if current_ext.lower() in pathext:
+            pathext = ['']
     else:
         pathext = ['']
 
     # Search the paths...
     for path in paths.split(os.pathsep):
+        p = os.path.join(path, command)
         for ext in pathext:
-            p = os.path.join(path, command + ext)
-            if os.path.exists(p) and not os.path.isdir(p):
-                return os.path.normcase(os.path.normpath(p))
+            p_with_ext = p + ext
+            if os.access(p_with_ext, os.X_OK):
+                return os.path.normcase(os.path.normpath(p_with_ext))
 
     return None
 
