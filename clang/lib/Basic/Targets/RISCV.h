@@ -30,24 +30,32 @@ protected:
   bool HasF;
   bool HasD;
   bool HasC;
+  bool HasV;
+
+  static const Builtin::Info BuiltinInfo[];
 
 public:
   RISCVTargetInfo(const llvm::Triple &Triple, const TargetOptions &)
       : TargetInfo(Triple), HasM(false), HasA(false), HasF(false),
-        HasD(false), HasC(false) {
+        HasD(false), HasC(false), HasV(false) {
     LongDoubleWidth = 128;
     LongDoubleAlign = 128;
     LongDoubleFormat = &llvm::APFloat::IEEEquad();
     SuitableAlign = 128;
     WCharType = SignedInt;
     WIntType = UnsignedInt;
+
+    LongWidth = LongAlign = PointerWidth = PointerAlign = 32;
+    MaxVectorAlign = 1024;
+    LongDoubleFormat = &llvm::APFloat::IEEEquad();
+    NoAsmVariants = true;
   }
 
   StringRef getABI() const override { return ABI; }
   void getTargetDefines(const LangOptions &Opts,
                         MacroBuilder &Builder) const override;
 
-  ArrayRef<Builtin::Info> getTargetBuiltins() const override { return None; }
+  ArrayRef<Builtin::Info> getTargetBuiltins() const override;
 
   BuiltinVaListKind getBuiltinVaListKind() const override {
     return TargetInfo::VoidPtrBuiltinVaList;

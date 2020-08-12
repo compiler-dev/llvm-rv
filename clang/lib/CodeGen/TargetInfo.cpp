@@ -9346,6 +9346,7 @@ public:
 
   ABIArgInfo extendType(QualType Ty) const;
 
+  bool isLegalVectorType(QualType Ty) const;
   bool detectFPCCEligibleStruct(QualType Ty, llvm::Type *&Field1Ty,
                                 CharUnits &Field1Off, llvm::Type *&Field2Ty,
                                 CharUnits &Field2Off, int &NeededArgGPRs,
@@ -9356,6 +9357,23 @@ public:
                                                CharUnits Field2Off) const;
 };
 } // end anonymous namespace
+
+//check whether the vector type is legal for riscv
+bool RISCVABIInfo::isLegalVectorType(QualType Ty) const {
+	if (const VectorType *VT = Ty->getAs<VectorType>()){
+
+		unsigned NumElements = VT->getNumElements();
+		uint64_t Size = getContext().getTypeSize(VT);
+		//NumElements should be power of 2.
+    if (llvm::isPowerOf2_32(NumElements))
+        return true;
+    llvm::Triple Triple = getTarget().getTriple();
+		if (Size != 128 && Size != 256 && Size != 512 && Size != 1024)
+			return false;
+		return true;
+	}
+	return false;
+}
 
 void RISCVABIInfo::computeInfo(CGFunctionInfo &FI) const {
   QualType RetTy = FI.getReturnType();
@@ -9680,6 +9698,12 @@ ABIArgInfo RISCVABIInfo::classifyArgumentType(QualType Ty, bool IsFixed,
     return ABIArgInfo::getDirect();
   }
 
+  if (!isAggregateTypeForABI(Ty) && isLegalVectorType(Ty)) {
+		if (const EnumType *EnumTy = Ty->getAs<EnumType>())
+			Ty = EnumTy->getDecl()->getIntegerType();
+	return (Ty->isPromotableIntegerType() ? ABIArgInfo::getExtend(Ty) : ABIArgInfo::getDirect());
+	}
+ 
   // Aggregates which are <= 2*XLen will be passed in registers if possible,
   // so coerce to integers.
   if (Size <= 2 * XLen) {

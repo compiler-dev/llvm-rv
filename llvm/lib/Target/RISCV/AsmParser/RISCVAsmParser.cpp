@@ -133,12 +133,17 @@ class RISCVAsmParser : public MCTargetAsmParser {
   OperandMatchResultTy parseImmediate(OperandVector &Operands);
   OperandMatchResultTy parseRegister(OperandVector &Operands,
                                      bool AllowParens = false);
+  OperandMatchResultTy parseRegisterV0asV0T(OperandVector &Operands,
+                                     bool AllowParens = false);
   OperandMatchResultTy parseMemOpBaseReg(OperandVector &Operands);
   OperandMatchResultTy parseAtomicMemOp(OperandVector &Operands);
   OperandMatchResultTy parseOperandWithModifier(OperandVector &Operands);
   OperandMatchResultTy parseBareSymbol(OperandVector &Operands);
   OperandMatchResultTy parseCallSymbol(OperandVector &Operands);
   OperandMatchResultTy parseJALOffset(OperandVector &Operands);
+  
+  OperandMatchResultTy parseVectorRegister(OperandVector &Operands);
+  OperandMatchResultTy parseVTypeImmAsmOperand(OperandVector &Operands);
 
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
 
@@ -218,7 +223,9 @@ struct RISCVOperand : public MCParsedAsmOperand {
     Token,
     Register,
     Immediate,
-    SystemRegister
+    SystemRegister,
+    VectorRegister,
+    VTypeImm
   } Kind;
 
   bool IsRV64;
@@ -238,13 +245,51 @@ struct RISCVOperand : public MCParsedAsmOperand {
     // FIXME: Add the Encoding parsed fields as needed for checks,
     // e.g.: read/write or user/supervisor/machine privileges.
   };
+  
+  struct VecRegOp {
+  	unsigned RegNum;
+  };
+  
+  enum class VLMUL {
+    LMUL_1 = 0,
+    LMUL_2,
+    LMUL_4,
+    LMUL_8,
+  };
+  
+    enum class VSEW {
+    SEW_8 = 0,
+    SEW_16,
+    SEW_32,
+    SEW_64,
+    SEW_128,
+    SEW_256,
+    SEW_512,
+    SEW_1024,
+  };
 
+  enum class VEDIV {
+    EDIV_1 = 0,
+    EDIV_2,
+    EDIV_4,
+    EDIV_8,
+  };
+  
+  struct VTypeIOp{
+  	VLMUL Lmul;
+    VSEW 	Sew;
+    VEDIV Ediv;
+    unsigned Encoding;
+  };
+    
   SMLoc StartLoc, EndLoc;
   union {
     StringRef Tok;
     RegOp Reg;
     ImmOp Imm;
     struct SysRegOp SysReg;
+    VecRegOp VReg;
+    struct VTypeIOp Vtypei;
   };
 
   RISCVOperand(KindTy K) : MCParsedAsmOperand(), Kind(K) {}
@@ -268,6 +313,12 @@ public:
     case KindTy::SystemRegister:
       SysReg = o.SysReg;
       break;
+    case KindTy::VectorRegister:
+      VReg = o.VReg;
+      break;  
+    case KindTy::VTypeImm:
+      Vtypei = o.Vtypei;
+      break; 
     }
   }
 
@@ -276,6 +327,8 @@ public:
   bool isImm() const override { return Kind == KindTy::Immediate; }
   bool isMem() const override { return false; }
   bool isSystemRegister() const { return Kind == KindTy::SystemRegister; }
+  bool isVectorRegister() const { return Kind == KindTy::VectorRegister; }
+  bool isVTypeImm() const { return Kind == KindTy::VTypeImm; }
 
   bool isGPR() const {
     return Kind == KindTy::Register &&
@@ -434,6 +487,15 @@ public:
     bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
     return IsConstantImm && isUInt<5>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
   }
+  
+  bool isSImm5() const {
+    if (!isImm())
+      return false;
+    RISCVMCExpr::VariantKind VK = RISCVMCExpr::VK_RISCV_None;
+    int64_t Imm;
+    bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
+    return IsConstantImm && isInt<5>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
+  }
 
   bool isUImm5NonZero() const {
     int64_t Imm;
@@ -474,6 +536,15 @@ public:
     return IsConstantImm && (Imm != 0) &&
            (isUInt<5>(Imm) || (Imm >= 0xfffe0 && Imm <= 0xfffff)) &&
            VK == RISCVMCExpr::VK_RISCV_None;
+  }
+
+  bool isUImm7() const{
+	int64_t Imm;
+	RISCVMCExpr::VariantKind VK;
+	if (!isImm())
+		return false;
+	bool IsConstantImm = evaluateConstantImm(getImm(), Imm, VK);
+	return IsConstantImm && isUInt<7>(Imm) && VK == RISCVMCExpr::VK_RISCV_None;
   }
 
   bool isUImm7Lsb00() const {
@@ -621,6 +692,74 @@ public:
     assert(Kind == KindTy::Register && "Invalid type access!");
     return Reg.RegNum.id();
   }
+  
+   unsigned getVecReg() const {
+    assert(Kind == KindTy::VectorRegister && "Invalid type access!");
+    return VReg.RegNum;
+  }
+  
+  static StringRef getSEW(VSEW sew) {
+    switch (sew) {
+    case VSEW::SEW_8:
+      return "e8";
+    case VSEW::SEW_16:
+      return "e16";
+    case VSEW::SEW_32:
+      return "e32";
+    case VSEW::SEW_64:
+      return "e64";
+    case VSEW::SEW_128:
+      return "e128";
+    case VSEW::SEW_256:
+      return "e256";
+    case VSEW::SEW_512:
+      return "e512";
+    case VSEW::SEW_1024:
+      return "e1024";
+    }
+    llvm_unreachable("SEW must be [8|16|32|64|128|256|512|1024]");
+  }
+
+  static StringRef getLMUL(VLMUL lmul) {
+    switch (lmul) {
+    case VLMUL::LMUL_1:
+      return "m1";
+    case VLMUL::LMUL_2:
+      return "m2";
+    case VLMUL::LMUL_4:
+      return "m4";
+    case VLMUL::LMUL_8:
+      return "m8";
+    }
+
+    llvm_unreachable("LMUL must be [1|2|4|8]"); 
+  }
+
+  static StringRef getEDIV(VEDIV ediv) {
+    switch (ediv) {
+    case VEDIV::EDIV_1:
+      return "d1";
+    case VEDIV::EDIV_2:
+      return "d2";
+    case VEDIV::EDIV_4:
+      return "d4";
+    case VEDIV::EDIV_8:
+      return "d8";
+    }
+    llvm_unreachable("EDIV must be [1|2|4|8]");
+  }
+  
+  StringRef getVTypeImm(SmallVectorImpl<char> &Out) const {
+    assert(Kind == KindTy::VTypeImm && "Invalid access!");
+    Twine vtypei(getSEW(Vtypei.Sew));
+    vtypei.concat(Twine(","));
+    vtypei.concat(Twine(getLMUL(Vtypei.Lmul)));
+    vtypei.concat(Twine(","));
+    vtypei.concat(Twine(getEDIV(Vtypei.Ediv)));
+
+    return vtypei.toStringRef(Out);
+  }
+
 
   StringRef getSysReg() const {
     assert(Kind == KindTy::SystemRegister && "Invalid access!");
@@ -652,6 +791,13 @@ public:
     case KindTy::SystemRegister:
       OS << "<sysreg: " << getSysReg() << '>';
       break;
+    case KindTy::VectorRegister:
+      OS << "<vecreg: " << getVecReg() << '>';
+      break;  
+    case KindTy::VTypeImm:
+	  SmallVector<char, 8> VTypeBuf;
+      OS << "<vtypei: " << getVTypeImm(VTypeBuf) << '>';
+      break; 
     }
   }
 
@@ -674,6 +820,31 @@ public:
     Op->IsRV64 = IsRV64;
     return Op;
   }
+  
+  static std::unique_ptr<RISCVOperand> createVecReg(unsigned RegNo,
+    									SMLoc S, SMLoc E, bool IsRV64) {
+    auto Op = std::make_unique<RISCVOperand>(KindTy::VectorRegister);
+    Op->VReg.RegNum = RegNo;
+    Op->StartLoc = S;
+    Op->EndLoc = E;
+    Op->IsRV64 = IsRV64;
+    return Op;
+  }
+  
+  static std::unique_ptr<RISCVOperand>
+  createVTypeImm(APInt sew, APInt lmul, APInt ediv, SMLoc S, bool IsRV64) {
+    auto Op = std::make_unique<RISCVOperand>(KindTy::VTypeImm);
+	sew.ashrInPlace(3);
+	Op->Vtypei.Sew = static_cast<VSEW>(sew.logBase2());
+    Op->Vtypei.Lmul = static_cast<VLMUL>(lmul.logBase2());
+    Op->Vtypei.Ediv = static_cast<VEDIV>(ediv.logBase2());
+
+    Op->Vtypei.Encoding = (ediv.logBase2() << 5) | (sew.logBase2() << 2) | (lmul.logBase2());
+    Op->StartLoc = S;
+    Op->IsRV64 = IsRV64;
+    return Op;
+  }
+
 
   static std::unique_ptr<RISCVOperand> createImm(const MCExpr *Val, SMLoc S,
                                                  SMLoc E, bool IsRV64) {
@@ -712,6 +883,16 @@ public:
   void addRegOperands(MCInst &Inst, unsigned N) const {
     assert(N == 1 && "Invalid number of operands!");
     Inst.addOperand(MCOperand::createReg(getReg()));
+  }
+
+  void addVectorRegisterOperands(MCInst &Inst, unsigned N) const {
+    assert(N == 1 && "Invalid number of operands!");
+    Inst.addOperand(MCOperand::createReg(getVecReg()));
+  }
+  
+  void addVTypeImmOperands(MCInst &Inst, unsigned N) const {
+    assert(N == 1 && "Invalid number of operands!");
+    Inst.addOperand(MCOperand::createImm(Vtypei.Encoding));
   }
 
   void addImmOperands(MCInst &Inst, unsigned N) const {
@@ -888,6 +1069,8 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     return generateImmOutOfRangeError(Operands, ErrorInfo, 1, (1 << 5) - 1);
   case Match_InvalidUImm5:
     return generateImmOutOfRangeError(Operands, ErrorInfo, 0, (1 << 5) - 1);
+  case Match_InvalidSImm5:
+    return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 4), (1 << 4) - 1);
   case Match_InvalidSImm6:
     return generateImmOutOfRangeError(Operands, ErrorInfo, -(1 << 5),
                                       (1 << 5) - 1);
@@ -984,6 +1167,24 @@ bool RISCVAsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
     SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
     return Error(ErrorLoc, "operand must be a symbol with %tprel_add modifier");
   }
+  case Match_InvalidVectorRegister: {
+    SMLoc ErrorLoc = IDLoc;
+    if (ErrorInfo != ~0U) {
+      if (ErrorInfo >= Operands.size())
+        return Error(ErrorLoc, "too few operands for instruction");
+
+      ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
+      if (ErrorLoc == SMLoc())
+        ErrorLoc = IDLoc;
+    }
+    return Error(ErrorLoc, "invalid operand for instruction");
+  }
+  case Match_InvalidVTypeImmAsmOperand: {
+    SMLoc ErrorLoc = ((RISCVOperand &)*Operands[ErrorInfo]).getStartLoc();
+    return Error(ErrorLoc,
+                 "operand must be e[8|16|32|64|128|256|512|1024],"
+                 "m[1|2|4|8], d[1|2|4|8]");
+  }
   }
 
   llvm_unreachable("Unknown match type detected!");
@@ -1028,6 +1229,7 @@ OperandMatchResultTy RISCVAsmParser::parseRegister(OperandVector &Operands,
   SMLoc FirstS = getLoc();
   bool HadParens = false;
   AsmToken LParen;
+  //const MCExpr *Res;
 
   // If this is an LParen and a parenthesised register name is allowed, parse it
   // atomically.
@@ -1070,6 +1272,79 @@ OperandMatchResultTy RISCVAsmParser::parseRegister(OperandVector &Operands,
   }
 
   return MatchOperand_Success;
+}
+
+OperandMatchResultTy RISCVAsmParser::parseVectorRegister(OperandVector &Operands) {
+
+    SMLoc S = getLoc();
+    SMLoc E = SMLoc::getFromPointer(S.getPointer() - 1);
+  
+  switch (getLexer().getKind()) {
+  default:
+	  return MatchOperand_NoMatch;
+  case AsmToken::Identifier:
+    StringRef Name = getLexer().getTok().getIdentifier();
+    Register RegNo = MatchRegisterName(Name);
+    getLexer().Lex();
+    Operands.push_back(RISCVOperand::createVecReg(RegNo, S, E, isRV64()));
+  }
+
+  return MatchOperand_Success;
+}
+
+OperandMatchResultTy RISCVAsmParser::parseVTypeImmAsmOperand(OperandVector &Operands) {
+	SMLoc S = getLoc();
+  if (getLexer().getKind() != AsmToken::Identifier)
+    return MatchOperand_NoMatch;
+  //logBase2()  0-->1
+  APInt sew(16, 1);
+  APInt lmul(16, 1);
+  APInt ediv(16, 1);
+
+  StringRef Name = getLexer().getTok().getIdentifier();
+  if (!Name.consume_front("e"))
+    return MatchOperand_NoMatch;
+  sew = APInt(16, Name, 10);
+  if (sew != 8 && sew != 16 && sew != 32 && sew != 64 && sew != 128 &&
+      sew != 256 && sew != 512 && sew != 1024)
+    return MatchOperand_NoMatch;
+  getLexer().Lex();
+  if (getLexer().is(AsmToken::EndOfStatement)) {
+    Operands.push_back(RISCVOperand::createVTypeImm(sew, lmul, ediv, S, isRV64()));
+    return MatchOperand_Success;
+  }
+  if(!getLexer().is(AsmToken::Comma))
+    return MatchOperand_NoMatch;
+  getLexer().Lex();
+  
+  Name = getLexer().getTok().getIdentifier();
+  if (Name.consume_front("m")) {
+    lmul = APInt(16, Name, 10);
+    if (lmul != 1 && lmul != 2 && lmul != 4 && lmul != 8)
+      return MatchOperand_NoMatch;
+    getLexer().Lex();
+    if (getLexer().is(AsmToken::EndOfStatement)) {
+      Operands.push_back(RISCVOperand::createVTypeImm(sew, lmul, ediv, S, isRV64()));
+      return MatchOperand_Success;
+    }
+  }
+  if(!getLexer().is(AsmToken::Comma))
+      return MatchOperand_NoMatch;
+  getLexer().Lex();
+  
+  Name = getLexer().getTok().getIdentifier();
+  if (Name.consume_front("d")) {
+  	ediv = APInt(16, Name, 10);
+    if (ediv != 1 && ediv != 2 && ediv != 4 && ediv != 8)
+      return MatchOperand_NoMatch;
+    getLexer().Lex();
+    if (getLexer().is(AsmToken::EndOfStatement)) {
+      Operands.push_back(RISCVOperand::createVTypeImm(sew, lmul, ediv, S, isRV64()));
+      return MatchOperand_Success;
+    }
+  }
+
+  return MatchOperand_NoMatch;
 }
 
 OperandMatchResultTy
@@ -1163,7 +1438,7 @@ OperandMatchResultTy RISCVAsmParser::parseImmediate(OperandVector &Operands) {
   case AsmToken::Percent:
     return parseOperandWithModifier(Operands);
   }
-
+  
   Operands.push_back(RISCVOperand::createImm(Res, S, E, isRV64()));
   return MatchOperand_Success;
 }
@@ -1304,6 +1579,7 @@ OperandMatchResultTy RISCVAsmParser::parseJALOffset(OperandVector &Operands) {
   return parseImmediate(Operands);
 }
 
+
 OperandMatchResultTy
 RISCVAsmParser::parseMemOpBaseReg(OperandVector &Operands) {
   if (getLexer().isNot(AsmToken::LParen)) {
@@ -1397,6 +1673,60 @@ OperandMatchResultTy RISCVAsmParser::parseAtomicMemOp(OperandVector &Operands) {
   return MatchOperand_Success;
 }
 
+
+OperandMatchResultTy RISCVAsmParser::parseRegisterV0asV0T(OperandVector &Operands,
+                                                   bool AllowParens) {
+  SMLoc FirstS = getLoc();
+  bool HadParens = false;
+  AsmToken LParen;
+  //const MCExpr *Res;
+
+  // If this is an LParen and a parenthesised register name is allowed, parse it
+  // atomically.
+  if (AllowParens && getLexer().is(AsmToken::LParen)) {
+    AsmToken Buf[2];
+    size_t ReadCount = getLexer().peekTokens(Buf);
+    if (ReadCount == 2 && Buf[1].getKind() == AsmToken::RParen) {
+      HadParens = true;
+      LParen = getParser().getTok();
+      getParser().Lex(); // Eat '('
+    }
+  }
+
+  switch (getLexer().getKind()) {
+  default:
+    if (HadParens)
+      getLexer().UnLex(LParen);
+    return MatchOperand_NoMatch;
+  case AsmToken::Identifier:
+    StringRef Name = getLexer().getTok().getIdentifier();
+    Register RegNo;
+    matchRegisterNameHelper(isRV32E(), RegNo, Name);
+
+	if (RegNo == RISCV::V0)
+		RegNo = RISCV::V0T;
+				
+    if (RegNo == RISCV::NoRegister) {
+      if (HadParens)
+        getLexer().UnLex(LParen);
+      return MatchOperand_NoMatch;
+    }
+    if (HadParens)
+      Operands.push_back(RISCVOperand::createToken("(", FirstS, isRV64()));
+    SMLoc S = getLoc();
+    SMLoc E = SMLoc::getFromPointer(S.getPointer() - 1);
+    getLexer().Lex();
+    Operands.push_back(RISCVOperand::createReg(RegNo, S, E, isRV64()));
+  }
+
+  if (HadParens) {
+    getParser().Lex(); // Eat ')'
+    Operands.push_back(RISCVOperand::createToken(")", getLoc(), isRV64()));
+  }
+
+  return MatchOperand_Success;
+}
+
 /// Looks at a token type and creates the relevant operand from this
 /// information, adding to Operands. If operand was parsed, returns false, else
 /// true.
@@ -1409,7 +1739,19 @@ bool RISCVAsmParser::parseOperand(OperandVector &Operands, StringRef Mnemonic) {
     return false;
   if (Result == MatchOperand_ParseFail)
     return true;
-
+    
+  if (Mnemonic.str() == "vadc.vvm" || Mnemonic.str() == "vadc.vxm" ||
+  	  Mnemonic.str() == "vadc.vim" || Mnemonic.str() == "vmadc.vvm" ||
+      Mnemonic.str() == "vmadc.vxm" || Mnemonic.str() == "vmadc.vim" ||
+  	  Mnemonic.str() == "vsbc.vvm" || Mnemonic.str() == "vsbc.vxm" ||
+  	  Mnemonic.str() == "vmsbc.vvm" || Mnemonic.str() == "vmsbc.vxm" ||
+  	  Mnemonic.str() == "vmerge.vvm" || Mnemonic.str() == "vmerge.vxm" ||
+  	  Mnemonic.str() == "vmerge.vim" || Mnemonic.str() == "vfmerge.vfm") {
+	  // Attempt to parse v0 as v0.t
+	  if (parseRegisterV0asV0T(Operands, true) ==  MatchOperand_Success)
+    			return false;
+	} 
+		
   // Attempt to parse token as a register.
   if (parseRegister(Operands, true) == MatchOperand_Success)
     return false;

@@ -13,6 +13,11 @@ module _Builtin_intrinsics [system] [extern_c] {
     header "altivec.h"
   }
 
+  explicit module riscv {
+    requires riscv
+    header "riscv_vector.h"
+  }
+
   explicit module arm {
     requires arm
 

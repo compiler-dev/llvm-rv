@@ -640,6 +640,11 @@ void TypePrinter::printVectorBefore(const VectorType *T, raw_ostream &OS) {
           T->getNumElements() << "))) ";
     printBefore(T->getElementType(), OS);
     break;
+  case VectorType::RiscvVector:
+    OS << "__attribute__((riscv_vector_type(" <<
+          T->getNumElements() << "))) ";
+    printBefore(T->getElementType(), OS);
+    break;
   case VectorType::GenericVector: {
     // FIXME: We prefer to print the size directly here, but have no way
     // to get the size of the type.
@@ -681,6 +686,13 @@ void TypePrinter::printDependentVectorBefore(
     break;
   case VectorType::NeonPolyVector:
     OS << "__attribute__((neon_polyvector_type(";
+    if (T->getSizeExpr())
+      T->getSizeExpr()->printPretty(OS, nullptr, Policy);
+    OS << "))) ";
+    printBefore(T->getElementType(), OS);
+    break;
+  case VectorType::RiscvVector:
+    OS << "__attribute__((riscv_vector_type(";
     if (T->getSizeExpr())
       T->getSizeExpr()->printPretty(OS, nullptr, Policy);
     OS << "))) ";
