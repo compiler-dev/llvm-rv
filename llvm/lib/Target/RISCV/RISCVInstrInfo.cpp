@@ -127,7 +127,6 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   {
 	Opc = RISCV::VMV_V_V;
     BuildMI(MBB, MBBI, DL, get(Opc), RISCV::V0)
-		.addReg(SrcReg, getKillRegState(KillSrc))
 		.addReg(SrcReg, getKillRegState(KillSrc));
 	return;
   }
