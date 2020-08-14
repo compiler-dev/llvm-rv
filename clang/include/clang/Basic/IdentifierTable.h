@@ -63,7 +63,7 @@ class alignas(IdentifierInfoAlignment) IdentifierInfo {
   // ObjC keyword ('protocol' in '@protocol') or builtin (__builtin_inf).
   // First NUM_OBJC_KEYWORDS values are for Objective-C,
   // the remaining values are for builtins.
-  unsigned ObjCOrBuiltinID : 13;
+  unsigned ObjCOrBuiltinID : 14;
 
   // True if there is a #define for this.
   unsigned HasMacro : 1;

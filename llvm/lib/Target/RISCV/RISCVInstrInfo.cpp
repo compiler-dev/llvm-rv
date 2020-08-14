@@ -38,6 +38,7 @@ RISCVInstrInfo::RISCVInstrInfo(RISCVSubtarget &STI)
 
 unsigned RISCVInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                              int &FrameIndex) const {
+                                             	
   switch (MI.getOpcode()) {
   default:
     return 0;
@@ -50,10 +51,16 @@ unsigned RISCVInstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
   case RISCV::LWU:
   case RISCV::LD:
   case RISCV::FLD:
+  case RISCV::VLE_V_um:
     break;
   }
-
-  if (MI.getOperand(1).isFI() && MI.getOperand(2).isImm() &&
+	
+	if ((MI.getOpcode() == RISCV::VLE_V_um) && MI.getOperand(1).isFI()){
+	  	
+		FrameIndex = MI.getOperand(1).getIndex();
+	  return MI.getOperand(0).getReg();
+	}
+  else if (MI.getOperand(1).isFI() && MI.getOperand(2).isImm() &&
       MI.getOperand(2).getImm() == 0) {
     FrameIndex = MI.getOperand(1).getIndex();
     return MI.getOperand(0).getReg();
@@ -73,10 +80,16 @@ unsigned RISCVInstrInfo::isStoreToStackSlot(const MachineInstr &MI,
   case RISCV::FSW:
   case RISCV::SD:
   case RISCV::FSD:
+  case RISCV::VSE_V_um:
     break;
   }
-
-  if (MI.getOperand(0).isFI() && MI.getOperand(1).isImm() &&
+	
+ if ((MI.getOpcode() == RISCV::VSE_V_um) && MI.getOperand(0).isFI()){
+		
+	FrameIndex = MI.getOperand(0).getIndex();
+	return MI.getOperand(1).getReg();
+  }
+  else if (MI.getOperand(0).isFI() && MI.getOperand(1).isImm() &&
       MI.getOperand(1).getImm() == 0) {
     FrameIndex = MI.getOperand(0).getIndex();
     return MI.getOperand(2).getReg();
@@ -102,6 +115,21 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     Opc = RISCV::FSGNJ_S;
   else if (RISCV::FPR64RegClass.contains(DstReg, SrcReg))
     Opc = RISCV::FSGNJ_D;
+  else if (RISCV::VGRRegClass.contains(DstReg, SrcReg))
+	Opc = RISCV::VMV_V_V;
+  else if (RISCV::VPRRegClass.contains(DstReg, SrcReg))
+	Opc = RISCV::VMV_V_V;
+  else if (RISCV::VQRRegClass.contains(DstReg, SrcReg)) 
+	Opc = RISCV::VMV_V_V;
+  else if (RISCV::VORRegClass.contains(DstReg, SrcReg)) 
+	Opc = RISCV::VMV_V_V;
+  else if (RISCV::VMASKRegClass.contains(DstReg) && RISCV::VGRRegClass.contains(SrcReg))
+  {
+	Opc = RISCV::VMV_V_V;
+    BuildMI(MBB, MBBI, DL, get(Opc), RISCV::V0)
+		.addReg(SrcReg, getKillRegState(KillSrc));
+	return;
+  }
   else
     llvm_unreachable("Impossible reg-to-reg copy");
 
@@ -128,13 +156,22 @@ void RISCVInstrInfo::storeRegToStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FSW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FSD;
+  else if (RISCV::VGRRegClass.hasSubClassEq(RC) || RISCV::VPRRegClass.hasSubClassEq(RC) ||
+		  RISCV::VQRRegClass.hasSubClassEq(RC) || RISCV::VORRegClass.hasSubClassEq(RC))
+  	Opcode = RISCV::VSE_V_um;
   else
     llvm_unreachable("Can't store this register to stack slot");
 
-  BuildMI(MBB, I, DL, get(Opcode))
+	if (Opcode == RISCV::VSE_V_um){
+		BuildMI(MBB, I, DL, get(Opcode))
+      .addReg(SrcReg, getKillRegState(IsKill))
+      .addFrameIndex(FI);
+	}else{
+  	BuildMI(MBB, I, DL, get(Opcode))
       .addReg(SrcReg, getKillRegState(IsKill))
       .addFrameIndex(FI)
       .addImm(0);
+    }
 }
 
 void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
@@ -155,10 +192,16 @@ void RISCVInstrInfo::loadRegFromStackSlot(MachineBasicBlock &MBB,
     Opcode = RISCV::FLW;
   else if (RISCV::FPR64RegClass.hasSubClassEq(RC))
     Opcode = RISCV::FLD;
+  else if (RISCV::VGRRegClass.hasSubClassEq(RC) || RISCV::VPRRegClass.hasSubClassEq(RC) ||
+		  RISCV::VQRRegClass.hasSubClassEq(RC) || RISCV::VORRegClass.hasSubClassEq(RC))
+  	Opcode = RISCV::VLE_V_um;
   else
     llvm_unreachable("Can't load this register from stack slot");
-
-  BuildMI(MBB, I, DL, get(Opcode), DstReg).addFrameIndex(FI).addImm(0);
+	
+	if (Opcode == RISCV::VLE_V_um)
+		BuildMI(MBB, I, DL, get(Opcode), DstReg).addFrameIndex(FI);
+	else
+		BuildMI(MBB, I, DL, get(Opcode), DstReg).addFrameIndex(FI).addImm(0);
 }
 
 void RISCVInstrInfo::movImm(MachineBasicBlock &MBB,

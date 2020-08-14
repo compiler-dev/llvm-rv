@@ -7509,6 +7509,79 @@ static void HandleNeonVectorTypeAttr(QualType &CurType, const ParsedAttr &Attr,
   CurType = S.Context.getVectorType(CurType, numElts, VecKind);
 }
 
+static bool isPermittedRiscvBaseType(QualType &Ty,
+                                    VectorType::VectorKind VecKind, Sema &S) {
+  const BuiltinType *BTy = Ty->getAs<BuiltinType>();
+  if (!BTy)
+    return false;
+
+  llvm::Triple Triple = S.Context.getTargetInfo().getTriple();
+
+  bool Is64Bit = Triple.getArch() == llvm::Triple::riscv64 ;
+
+
+  if (Is64Bit)
+    return false;
+
+  return BTy->getKind() == BuiltinType::SChar ||
+         BTy->getKind() == BuiltinType::UChar ||
+         BTy->getKind() == BuiltinType::Short ||
+         BTy->getKind() == BuiltinType::UShort ||
+         BTy->getKind() == BuiltinType::Int ||
+         BTy->getKind() == BuiltinType::UInt ||
+         BTy->getKind() == BuiltinType::Float;
+}
+
+/// HandleRiscvVectorTypeAttr - The "riscv_vector_type" 
+//  attributes are used to create vector types that
+/// are mangled according to Riscv's ABI. 
+static void HandleRiscvVectorTypeAttr(QualType &CurType, const ParsedAttr &Attr,
+                                     Sema &S, VectorType::VectorKind VecKind) {
+  // Target must have RISCV32 
+  if (!S.Context.getTargetInfo().hasFeature("v")) {
+    S.Diag(Attr.getLoc(), diag::err_attribute_unsupported) << Attr;
+    Attr.setInvalid();
+    return;
+  }
+  // Check the attribute arguments.
+  if (Attr.getNumArgs() != 1) {
+    S.Diag(Attr.getLoc(), diag::err_attribute_wrong_number_arguments)
+      << Attr << 1;
+    Attr.setInvalid();
+    return;
+  }
+  // The number of elements must be an ICE.
+  Expr *numEltsExpr = static_cast<Expr *>(Attr.getArgAsExpr(0));
+  llvm::APSInt numEltsInt(32);
+  if (numEltsExpr->isTypeDependent() || numEltsExpr->isValueDependent() ||
+      !numEltsExpr->isIntegerConstantExpr(numEltsInt, S.Context)) {
+    S.Diag(Attr.getLoc(), diag::err_attribute_argument_type)
+      << Attr << AANT_ArgumentIntegerConstant
+      << numEltsExpr->getSourceRange();
+    Attr.setInvalid();
+    return;
+  }
+  // Only certain element types are supported for RISCV vectors.
+  if (!isPermittedRiscvBaseType(CurType, VecKind, S)) {
+    S.Diag(Attr.getLoc(), diag::err_attribute_invalid_vector_type) << CurType;
+    Attr.setInvalid();
+    return;
+  }
+
+  // The total size of the vector must be 128|256|512|1024bits.
+  unsigned typeSize = static_cast<unsigned>(S.Context.getTypeSize(CurType));
+  unsigned numElts = static_cast<unsigned>(numEltsInt.getZExtValue());
+  unsigned vecSize = typeSize * numElts;
+  if (vecSize != 128 && vecSize !=256 && vecSize != 512 && vecSize !=1024) {   
+    S.Diag(Attr.getLoc(), diag::err_attribute_bad_riscv_vector_size) << CurType;
+    Attr.setInvalid();
+    return;
+  }
+
+  CurType = S.Context.getVectorType(CurType, numElts, VecKind);
+}
+
+
 /// Handle OpenCL Access Qualifier Attribute.
 static void HandleOpenCLAccessAttr(QualType &CurType, const ParsedAttr &Attr,
                                    Sema &S) {
@@ -7691,6 +7764,11 @@ static void processTypeAttrs(TypeProcessingState &state, QualType &type,
     case ParsedAttr::AT_NeonPolyVectorType:
       HandleNeonVectorTypeAttr(type, attr, state.getSema(),
                                VectorType::NeonPolyVector);
+      attr.setUsedAsTypeAttr();
+      break;
+    case ParsedAttr::AT_RiscvVectorType:
+      HandleRiscvVectorTypeAttr(type, attr, state.getSema(),
+                               VectorType::RiscvVector);
       attr.setUsedAsTypeAttr();
       break;
     case ParsedAttr::AT_OpenCLAccess:

@@ -80,6 +80,7 @@ public:
   unsigned getImmOpValue(const MCInst &MI, unsigned OpNo,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const;
+
 };
 } // end anonymous namespace
 

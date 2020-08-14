@@ -608,6 +608,9 @@ void JSONNodeDumper::VisitVectorType(const VectorType *VT) {
   case VectorType::NeonPolyVector:
     JOS.attribute("vectorKind", "neon poly");
     break;
+  case VectorType::RiscvVector:
+    JOS.attribute("vectorKind", "Riscv");
+    break;
   }
 }
 

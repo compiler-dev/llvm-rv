@@ -12,10 +12,20 @@
 
 #include "RISCV.h"
 #include "clang/Basic/MacroBuilder.h"
+#include "clang/Basic/TargetBuiltins.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace clang;
 using namespace clang::targets;
+	
+//initialize builtins table
+const Builtin::Info RISCVTargetInfo::BuiltinInfo[] = {
+#define BUILTIN(ID, TYPE, ATTRS)                                               \
+	  {#ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
+#define LIBBUILTIN(ID, TYPE, ATTRS, HEADER)                                    \
+	  {#ID, TYPE, ATTRS, HEADER, ALL_LANGUAGES, nullptr},
+#include "clang/Basic/BuiltinsRISCV.def"
+};
 
 ArrayRef<const char *> RISCVTargetInfo::getGCCRegNames() const {
   static const char *const GCCRegNames[] = {
@@ -29,7 +39,14 @@ ArrayRef<const char *> RISCVTargetInfo::getGCCRegNames() const {
       "f0",  "f1",  "f2",  "f3",  "f4",  "f5",  "f6",  "f7",
       "f8",  "f9",  "f10", "f11", "f12", "f13", "f14", "f15",
       "f16", "f17", "f18", "f19", "f20", "f21", "f22", "f23",
-      "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31"};
+      "f24", "f25", "f26", "f27", "f28", "f29", "f30", "f31"
+	  
+	  "arg", "frame",
+	  "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7",
+	  "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15",
+	  "v16", "v17", "v18", "v19", "v20", "v21", "v22", "v23",
+	  "v24", "v25", "v26", "v27", "v28", "v29", "v30", "v31"
+  };
   return llvm::makeArrayRef(GCCRegNames);
 }
 
@@ -73,6 +90,10 @@ bool RISCVTargetInfo::validateAsmConstraint(
     return true;
   case 'f':
     // A floating-point register.
+    Info.setAllowsRegister();
+    return true;
+  case 'v':
+    // vector register.
     Info.setAllowsRegister();
     return true;
   case 'A':
@@ -125,6 +146,14 @@ void RISCVTargetInfo::getTargetDefines(const LangOptions &Opts,
 
   if (HasC)
     Builder.defineMacro("__riscv_compressed");
+
+  if (HasV)
+	Builder.defineMacro("__RISCV_VECTOR__");
+}
+
+ArrayRef<Builtin::Info> RISCVTargetInfo::getTargetBuiltins() const {
+  return llvm::makeArrayRef(BuiltinInfo, clang::RISCV::LastTSBuiltin -
+                                             Builtin::FirstTSBuiltin);
 }
 
 /// Return true if has this feature, need to sync with handleTargetFeatures.
@@ -139,6 +168,7 @@ bool RISCVTargetInfo::hasFeature(StringRef Feature) const {
       .Case("f", HasF)
       .Case("d", HasD)
       .Case("c", HasC)
+      .Case("v", HasV)
       .Default(false);
 }
 
@@ -156,6 +186,8 @@ bool RISCVTargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       HasD = true;
     else if (Feature == "+c")
       HasC = true;
+	else if (Feature == "+v")
+	  HasV = true;
   }
 
   return true;

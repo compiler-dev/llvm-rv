@@ -2715,6 +2715,8 @@ def err_attribute_too_few_arguments : Error<
 def err_attribute_invalid_vector_type : Error<"invalid vector element type %0">;
 def err_attribute_bad_neon_vector_size : Error<
   "Neon vector size must be 64 or 128 bits">;
+def err_attribute_bad_riscv_vector_size : Error<
+  "Riscv vector size must be 128-256-512-1024 bits">;
 def err_attribute_requires_positive_integer : Error<
   "%0 attribute requires a %select{positive|non-negative}1 "
   "integral compile time constant expression">;
@@ -10372,5 +10374,4 @@ def warn_sycl_kernel_num_of_function_params : Warning<
 def warn_sycl_kernel_return_type : Warning<
   "function template with 'sycl_kernel' attribute must have a 'void' return type">,
   InGroup<IgnoredAttributes>;
-
 } // end of sema component.

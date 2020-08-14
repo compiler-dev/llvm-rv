@@ -87,6 +87,31 @@ void RISCVInstPrinter::printOperand(const MCInst *MI, unsigned OpNo,
                                     const char *Modifier) {
   assert((Modifier == 0 || Modifier[0] == 0) && "No modifiers supported");
   const MCOperand &MO = MI->getOperand(OpNo);
+switch (MI->getOpcode()){
+	  default:
+		  break;
+	  case RISCV::VMADC_VVM:
+	  case RISCV::VMADC_VXM:
+	  case RISCV::VMADC_VIM:
+	  case RISCV::VADC_VVM:
+	  case RISCV::VADC_VXM:
+	  case RISCV::VADC_VIM:
+	  case RISCV::VSBC_VVM:
+	  case RISCV::VSBC_VXM:
+	  case RISCV::VMSBC_VVM:
+	  case RISCV::VMSBC_VXM:
+	  case RISCV::VMERGE_VVM:
+	  case RISCV::VMERGE_VXM:
+	  case RISCV::VMERGE_VIM:
+	  case RISCV::VFMERGE_VFM:{
+		if (MO.isReg() && (MO.getReg() == RISCV::V0T)) {
+			printRegName(O, RISCV::V0);
+			return;
+		}
+	}
+
+  }
+
 
   if (MO.isReg()) {
     printRegName(O, MO.getReg());
@@ -149,6 +174,33 @@ void RISCVInstPrinter::printAtomicMemOp(const MCInst *MI, unsigned OpNo,
   O << ")";
   return;
 }
+
+void RISCVInstPrinter::printVectorRegister(const MCInst *MI, unsigned OpNo,
+                                        const MCSubtargetInfo &STI,
+                                        raw_ostream &O) {
+	unsigned Reg = MI->getOperand(OpNo).getReg();
+	printRegName(O,Reg);
+	return;
+}
+
+void RISCVInstPrinter::printVTypeImm(const MCInst *MI, unsigned OpNo,
+								const MCSubtargetInfo &STI, raw_ostream &O){
+	unsigned Imm = MI->getOperand(OpNo).getImm();
+	unsigned Ediv = (Imm >> 5) & 3;
+	unsigned Sew = (Imm >> 2) & 7;
+	unsigned Lmul = Imm & 3;
+
+	//get value
+	Sew = 1 << (Sew + 3);
+	Lmul = 1 << Lmul;
+	Ediv = 1 << Ediv;
+
+	O << "e" << Sew;
+	O << ", m" << Lmul;
+	O << ", d" << Ediv;
+
+}
+
 
 const char *RISCVInstPrinter::getRegisterName(unsigned RegNo) {
   return getRegisterName(RegNo, ArchRegNames ? RISCV::NoRegAltName

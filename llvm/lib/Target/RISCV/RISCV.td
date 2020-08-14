@@ -48,6 +48,13 @@ def HasStdExtC : Predicate<"Subtarget->hasStdExtC()">,
                            AssemblerPredicate<"FeatureStdExtC",
                            "'C' (Compressed Instructions)">;
 
+def FeatureStdExtV
+    : SubtargetFeature<"v", "HasStdExtV", "true",
+                       "'V' (Enable Vector Instructions)">;
+def HasStdExtV : Predicate<"Subtarget->hasStdExtV()">,
+                           AssemblerPredicate<"FeatureStdExtV",
+                           "'V' (Vector Instructions)">;
+
 def FeatureRVCHints
     : SubtargetFeature<"rvc-hints", "EnableRVCHintInstrs", "true",
                        "Enable RVC Hint Instructions.">;

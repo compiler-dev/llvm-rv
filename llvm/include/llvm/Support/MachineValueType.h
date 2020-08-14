@@ -374,7 +374,7 @@ namespace llvm {
     bool is1024BitVector() const {
       return (SimpleTy == MVT::v1024i1 || SimpleTy == MVT::v128i8 ||
               SimpleTy == MVT::v64i16  || SimpleTy == MVT::v32i32 ||
-              SimpleTy == MVT::v16i64);
+              SimpleTy == MVT::v16i64  || SimpleTy == MVT::v32f32);
     }
 
     /// Return true if this is a 2048-bit vector type.

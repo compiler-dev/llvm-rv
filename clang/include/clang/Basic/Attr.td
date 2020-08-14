@@ -1479,6 +1479,13 @@ def NeonVectorType : TypeAttr {
   let ASTNode = 0;
 }
 
+//to support riscv vector type
+def RiscvVectorType : TypeAttr {
+  let Spellings = [Clang<"riscv_vector_type">];
+  let Args = [IntArgument<"NumElements">];
+  let Documentation = [Undocumented];
+}
+
 def NoUniqueAddress : InheritableAttr, TargetSpecificAttr<TargetItaniumCXXABI> {
   let Spellings = [CXX11<"", "no_unique_address", 201803>];
   let Subjects = SubjectList<[NonBitField], ErrorDiag>;

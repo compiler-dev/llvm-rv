@@ -87,6 +87,29 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
   if (Subtarget.hasStdExtD())
     addRegisterClass(MVT::f64, &RISCV::FPR64RegClass);
 
+  if (Subtarget.hasStdExtV()){
+	addRegisterClass(MVT::v16i8, &RISCV::VGRRegClass);
+	addRegisterClass(MVT::v8i16, &RISCV::VGRRegClass);
+	addRegisterClass(MVT::v4i32, &RISCV::VGRRegClass);
+	addRegisterClass(MVT::v4f32, &RISCV::VGRRegClass);
+
+
+	addRegisterClass(MVT::v32i8,  &RISCV::VPRRegClass);
+	addRegisterClass(MVT::v16i16, &RISCV::VPRRegClass);
+	addRegisterClass(MVT::v8i32,  &RISCV::VPRRegClass);
+	addRegisterClass(MVT::v8f32,  &RISCV::VPRRegClass);
+
+	addRegisterClass(MVT::v64i8,  &RISCV::VQRRegClass);
+	addRegisterClass(MVT::v32i16, &RISCV::VQRRegClass);
+	addRegisterClass(MVT::v16i32, &RISCV::VQRRegClass);
+	addRegisterClass(MVT::v16f32, &RISCV::VQRRegClass);
+
+	addRegisterClass(MVT::v128i8, &RISCV::VORRegClass);
+	addRegisterClass(MVT::v64i16, &RISCV::VORRegClass);
+	addRegisterClass(MVT::v32i32, &RISCV::VORRegClass);
+	addRegisterClass(MVT::v32f32, &RISCV::VORRegClass);
+  }
+
   // Compute derived properties from the register classes.
   computeRegisterProperties(STI.getRegisterInfo());
 
@@ -203,6 +226,17 @@ RISCVTargetLowering::RISCVTargetLowering(const TargetMachine &TM,
     setOperationAction(ISD::FP_TO_SINT, MVT::i32, Custom);
     setOperationAction(ISD::STRICT_FP_TO_UINT, MVT::i32, Custom);
     setOperationAction(ISD::STRICT_FP_TO_SINT, MVT::i32, Custom);
+  }
+
+  if (Subtarget.hasStdExtV()){
+	  for (auto VT : {MVT::v16i8, MVT::v32i8, MVT::v64i8, MVT::v128i8,
+					  MVT::v8i16, MVT::v16i16, MVT::v32i16, MVT::v64i16,
+					  MVT::v4i32, MVT::v8i32, MVT::v16i32, MVT::v32i32,
+					  MVT::v4f32, MVT::v8f32, MVT::v16f32, MVT::v32f32}){
+		  setOperationAction(ISD::BUILD_VECTOR, VT, Custom);
+		  setOperationAction(ISD::EXTRACT_VECTOR_ELT, VT, Custom);
+		  setOperationAction(ISD::INSERT_VECTOR_ELT, VT, Custom);
+	  }
   }
 
   setOperationAction(ISD::GlobalAddress, XLenVT, Custom);
@@ -403,6 +437,12 @@ SDValue RISCVTargetLowering::LowerOperation(SDValue Op,
     return lowerGlobalTLSAddress(Op, DAG);
   case ISD::SELECT:
     return lowerSELECT(Op, DAG);
+  case ISD::BUILD_VECTOR:
+    return lowerBUILD_VECTOR(Op, DAG);
+  case ISD::EXTRACT_VECTOR_ELT:
+    return lowerEXTRACT_VECTOR_ELT(Op, DAG);
+  case ISD::INSERT_VECTOR_ELT:
+    return lowerINSERT_VECTOR_ELT(Op, DAG);
   case ISD::VASTART:
     return lowerVASTART(Op, DAG);
   case ISD::FRAMEADDR:
@@ -668,6 +708,191 @@ SDValue RISCVTargetLowering::lowerSELECT(SDValue Op, SelectionDAG &DAG) const {
   SDValue Ops[] = {CondV, Zero, SetNE, TrueV, FalseV};
 
   return DAG.getNode(RISCVISD::SELECT_CC, DL, VTs, Ops);
+}
+
+SDValue RISCVTargetLowering::lowerBUILD_VECTOR(SDValue Op, SelectionDAG &DAG) const {
+	assert(Op.getOpcode() == ISD::BUILD_VECTOR && "unknown opcode.");
+
+	EVT VT = Op.getValueType();
+	SDLoc DL(Op);
+	unsigned NumElts = VT.getVectorNumElements();
+	bool isConstant = true;
+	SDValue Value;
+	for (unsigned i = 0; i < NumElts; ++i){
+		SDValue V = Op.getOperand(i);
+		if (V.isUndef())
+			continue;
+		if (!isa<ConstantFPSDNode>(V) && !isa<ConstantSDNode>(V))
+			isConstant = false;
+		if (!Value.getNode())
+			Value = V;
+	}
+
+	if (!Value.getNode()){
+		LLVM_DEBUG(dbgs() << "LowerBUILD_VECTOR: value undefined, creating undef node.\n");
+		return DAG.getUNDEF(VT);
+	}
+
+	if (isConstant){
+		LLVM_DEBUG(dbgs() << "LowerBUILD_VECTOR: all elements are constant, use default expression.\n");
+		return SDValue();
+	}
+	return SDValue();
+}
+
+SDValue RISCVTargetLowering::lowerEXTRACT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) const {
+	assert(Op.getOpcode() == ISD::EXTRACT_VECTOR_ELT && "unknown opcode.");
+
+	EVT VT = Op.getOperand(0).getValueType();
+	SDLoc DL(Op);
+	if (isa<ConstantSDNode>(Op.getOperand(1))){
+		unsigned Imm = cast<ConstantSDNode>(Op.getOperand(1))->getZExtValue();
+		if (Imm == 0){
+			if (VT == MVT::v16i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_8m1, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v32i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_8m2, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v64i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_8m4, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v128i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_8m8, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v8i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_16m1, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v16i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_16m2, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v32i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_16m4, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v64i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_16m8, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v4i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_32m1, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v8i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_32m2, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v16i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_32m4, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v32i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vmv_x_s_32m8, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v4f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vfmv_f_s_f32m1, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v8f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vfmv_f_s_f32m2, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v16f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vfmv_f_s_f32m4, DL, MVT::i32),
+						Op.getOperand(0));
+			else if (VT == MVT::v32f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType(),
+						DAG.getConstant(Intrinsic::riscv_vfmv_f_s_f32m8, DL, MVT::i32),
+						Op.getOperand(0));
+		}
+	}
+	return SDValue();
+}
+
+SDValue RISCVTargetLowering::lowerINSERT_VECTOR_ELT(SDValue Op, SelectionDAG &DAG) const {
+	assert(Op.getOpcode() == ISD::INSERT_VECTOR_ELT && "unknown opcode.");
+
+	EVT VT = Op.getOperand(0).getValueType();
+	SDLoc DL(Op);
+
+	if (isa<ConstantSDNode>(Op.getOperand(2))){
+		unsigned Imm = cast<ConstantSDNode>(Op.getOperand(2))->getZExtValue();
+		if (Imm == 0){
+			if (VT == MVT::v16i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_8m1, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v32i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_8m2, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v64i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_8m4, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v128i8)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_8m8, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v8i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_16m1, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v16i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_16m2, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v32i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_16m4, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v64i16)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_16m8, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v4i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_32m1, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v8i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_32m2, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v16i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_32m4, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v32i32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vmv_s_x_32m8, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v4f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vfmv_s_f_f32m1, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v8f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vfmv_s_f_f32m2, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v16f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vfmv_s_f_f32m4, DL, MVT::i32),
+						Op.getOperand(1);
+			else if (VT == MVT::v32f32)
+				return DAG.getNode(ISD::INTRINSIC_WO_CHAIN, DL, Op.getValueType()),
+					    DAG.getConstant(Intrinsic::riscv_vfmv_s_f_f32m8, DL, MVT::i32),
+						Op.getOperand(1);
+		}
+	}
+	return SDValue();
 }
 
 SDValue RISCVTargetLowering::lowerVASTART(SDValue Op, SelectionDAG &DAG) const {
@@ -1451,6 +1676,22 @@ static const MCPhysReg ArgFPR64s[] = {
   RISCV::F14_D, RISCV::F15_D, RISCV::F16_D, RISCV::F17_D
 };
 
+static const MCPhysReg ArgVGRs[] = {
+  RISCV::V8, RISCV::V9, RISCV::V10, RISCV::V11,
+  RISCV::V12, RISCV::V13, RISCV::V14, RISCV::V15
+};
+
+static const MCPhysReg ArgVPRs[] = {
+  RISCV::VP4, RISCV::VP5, RISCV::VP6, RISCV::VP7
+};
+
+static const MCPhysReg ArgVQRs[] = {
+  RISCV::VQ2, RISCV::VQ3
+};
+
+static const MCPhysReg ArgVORs[] = {
+  RISCV::VO1
+};
 // Pass a 2*XLEN argument that has been split into two XLEN values through
 // registers or the stack as necessary.
 static bool CC_RISCVAssign2XLen(unsigned XLen, CCState &State, CCValAssign VA1,
@@ -1576,6 +1817,7 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
     // stack. LowerCall/LowerFormalArguments/LowerReturn must recognise these
     // cases.
     Register Reg = State.AllocateReg(ArgGPRs);
+    unsigned StackOffset = 0;
     LocVT = MVT::i32;
     if (!Reg) {
       unsigned StackOffset = State.AllocateStack(8, 8);
@@ -1584,9 +1826,16 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
       return false;
     }
     if (!State.AllocateReg(ArgGPRs))
-      State.AllocateStack(4, 4);
-    State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
-    return false;
+      	StackOffset = State.AllocateStack(4, 4);
+     // The rest part of the f64 should be in the first stack slot if no need to record the stack loc.
+     // There should be an issue if the rest part of the f64 is not in the first stack slot. 
+     // eg. the vector args in the first stack slot
+     if (StackOffset == 0){
+	State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
+	return false;
+     }
+     State.addLoc(CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
+    	return false;
   }
 
   // Split arguments might be passed indirectly, so keep track of the pending
@@ -1616,6 +1865,72 @@ static bool CC_RISCV(const DataLayout &DL, RISCVABI::ABI ABI, unsigned ValNo,
                                ArgFlags);
   }
 
+  //Allocate to a vector register if possible, or else a stack slot
+  if (ValVT.is128BitVector())
+  {
+    unsigned Reg;
+    Reg = State.AllocateReg(ArgVGRs);
+
+    if(Reg)
+     State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
+     else
+     {
+        //allocate 16 bytes with the alignment of 2 for a vector argument.
+      unsigned StackOffset = State.AllocateStack(16, 2);
+      State.addLoc(CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
+     }
+     
+    return false;
+  } else if (ValVT.is256BitVector())
+  {
+
+    unsigned Reg;
+    Reg = State.AllocateReg(ArgVPRs);
+
+    if(Reg)
+     State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
+     else
+     {
+        //allocate 32 bytes with the alignment of 2 for a vector argument.
+      unsigned StackOffset = State.AllocateStack(32, 2);
+      State.addLoc(CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
+     }
+     
+    return false;
+  } else if (ValVT.is512BitVector())
+  {
+
+    unsigned Reg;
+    Reg = State.AllocateReg(ArgVQRs);
+
+    if(Reg)
+     State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
+     else
+     {
+        //allocate 64 bytes with the alignment of 2 for a vector argument.
+      unsigned StackOffset = State.AllocateStack(64, 2);
+      State.addLoc(CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
+     }
+     
+    return false;
+  } else if (ValVT.is1024BitVector())
+  {
+
+    unsigned Reg;
+    Reg = State.AllocateReg(ArgVORs);
+
+    if(Reg)
+     State.addLoc(CCValAssign::getReg(ValNo, ValVT, Reg, LocVT, LocInfo));
+     else
+     {
+        //allocate 128 bytes with the alignment of 2 for a vector argument.
+      unsigned StackOffset = State.AllocateStack(128, 2);
+      State.addLoc(CCValAssign::getMem(ValNo, ValVT, StackOffset, LocVT, LocInfo));
+     }
+     
+    return false;
+  }
+  
   // Allocate to a register if possible, or else a stack slot.
   Register Reg;
   if (ValVT == MVT::f32 && !UseGPRForF32)
@@ -1751,6 +2066,31 @@ static SDValue unpackFromRegLoc(SelectionDAG &DAG, SDValue Chain,
   case MVT::f64:
     RC = &RISCV::FPR64RegClass;
     break;
+  //to get the incoming args from the vector argument regs table.
+  case MVT::v16i8:
+  case MVT::v8i16:
+  case MVT::v4i32:
+  case MVT::v4f32:
+  	RC = &RISCV::VGRRegClass;
+	break;
+  case MVT::v32i8:
+  case MVT::v16i16:
+  case MVT::v8i32:
+  case MVT::v8f32:
+	RC = &RISCV::VPRRegClass;
+	break;
+  case MVT::v64i8:
+  case MVT::v32i16:
+  case MVT::v16i32:
+  case MVT::v16f32:
+	RC = &RISCV::VQRRegClass;
+	break;
+  case MVT::v128i8:
+  case MVT::v64i16:
+  case MVT::v32i32:
+  case MVT::v32f32:
+	RC = &RISCV::VORRegClass;
+  	break;
   }
 
   Register VReg = RegInfo.createVirtualRegister(RC);
@@ -1957,8 +2297,34 @@ SDValue RISCVTargetLowering::LowerFormalArguments(
     SDValue ArgValue;
     // Passing f64 on RV32D with a soft float ABI must be handled as a special
     // case.
-    if (VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64)
-      ArgValue = unpackF64OnRV32DSoftABI(DAG, Chain, VA, DL);
+    if (VA.getLocVT() == MVT::i32 && VA.getValVT() == MVT::f64){
+    	if (VA.getLocReg() == RISCV::X17) {
+			MachineFunction &MF = DAG.getMachineFunction();
+			MachineFrameInfo &MFI = MF.getFrameInfo();
+			MachineRegisterInfo &RegInfo = MF.getRegInfo();
+
+			// Second half of f64 is passed on the stack.
+			//since the vector args were also spilled into the stack,so the first stack slot
+			//may not be the rest part of the f64.
+			CCValAssign &VA_Rest = ArgLocs[i+1];
+			assert(VA_Rest.isMemLoc());
+			unsigned LoVReg = RegInfo.createVirtualRegister(&RISCV::GPRRegClass);
+			RegInfo.addLiveIn(VA.getLocReg(), LoVReg);
+			SDValue Lo = DAG.getCopyFromReg(Chain, DL, LoVReg, MVT::i32);
+			int FI = MFI.CreateFixedObject(4,
+					VA_Rest.getLocMemOffset(), /*Immutable=*/true);
+			SDValue FIN = DAG.getFrameIndex(FI, MVT::i32);
+			SDValue Hi = DAG.getLoad(MVT::i32, DL, Chain, FIN,
+					MachinePointerInfo::getFixedStack(MF, FI));
+
+			ArgValue =  DAG.getNode(RISCVISD::BuildPairF64, DL, MVT::f64, Lo, Hi);
+
+			//already get the rest part of the f64 from the Argloc array,
+			//don't forget to update the loc index.
+			i++;
+		}
+      else ArgValue = unpackF64OnRV32DSoftABI(DAG, Chain, VA, DL);
+    }
     else if (VA.isRegLoc())
       ArgValue = unpackFromRegLoc(DAG, Chain, VA, DL);
     else
@@ -2064,6 +2430,10 @@ bool RISCVTargetLowering::isEligibleForTailCallOptimization(
   auto &Caller = MF.getFunction();
   auto CallerCC = Caller.getCallingConv();
 
+	// Do not tail call opt functions with "disable-tail-calls" attribute.
+  if (Caller.getFnAttribute("disable-tail-calls").getValueAsString() == "true")
+    return false;
+    
   // Exception-handling functions need a special set of instructions to
   // indicate a return to the hardware. Tail-calling another function would
   // probably break this.
@@ -2215,11 +2585,27 @@ SDValue RISCVTargetLowering::LowerCall(CallLoweringInfo &CLI,
       if (RegLo == RISCV::X17) {
         // Second half of f64 is passed on the stack.
         // Work out the address of the stack slot.
+        // the Second half of f64 may not store in the first stack slot. eg.
+        // the vector arguments regs were exhausted before the GPR.
         if (!StackPtr.getNode())
           StackPtr = DAG.getCopyFromReg(Chain, DL, RISCV::X2, PtrVT);
         // Emit the store.
         MemOpChains.push_back(
             DAG.getStore(Chain, DL, Hi, StackPtr, MachinePointerInfo()));
+            
+        //get the rest part of the f64 from the ArgLocs Array.
+        CCValAssign &VA_Rest = ArgLocs[i+1];
+        assert(VA_Rest.isMemLoc());
+
+        SDValue Address =
+            DAG.getNode(ISD::ADD, DL, PtrVT, StackPtr,
+                        DAG.getIntPtrConstant(VA_Rest.getLocMemOffset(), DL));
+        // Emit the store.
+        MemOpChains.push_back(
+            DAG.getStore(Chain, DL, Hi, Address, MachinePointerInfo()));
+        //since already get the rest part of the f64 from the ArgLocs array,
+        //don't forget to update the arg index.
+        i++;
       } else {
         // Second half of f64 is passed in another GPR.
         assert(RegLo < RISCV::X31 && "Invalid register pair");

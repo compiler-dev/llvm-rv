@@ -148,6 +148,40 @@ static DecodeStatus DecodeGPRCRegisterClass(MCInst &Inst, uint64_t RegNo,
   return MCDisassembler::Success;
 }
 
+
+static DecodeStatus DecodeVGRRegisterClass(MCInst &Inst, uint64_t RegNo,
+                                           uint64_t Address,
+                                           const void *Decoder) {
+  if (RegNo >= 32)
+    return MCDisassembler::Fail;
+
+  Register Reg = RISCV::V0 + RegNo;
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
+static DecodeStatus DecodeVMASKRegisterClass(MCInst &Inst, uint64_t RegNo,
+                                           uint64_t Address,
+                                           const void *Decoder) {
+  if (RegNo >= 1)
+    return MCDisassembler::Fail;
+
+  Register Reg = RISCV::V0T;
+
+  Inst.addOperand(MCOperand::createReg(Reg));
+  return MCDisassembler::Success;
+}
+
+static DecodeStatus decodeVectorRegister(MCInst &Inst, uint64_t RegNo,
+										uint64_t Address,
+										const void *Decoder) {
+	if (RegNo >= 32)
+		return MCDisassembler::Fail;
+	Register Reg = RISCV::V0 + RegNo;
+	Inst.addOperand(MCOperand::createReg(Reg));
+	return MCDisassembler::Success;
+}
+
 // Add implied SP operand for instructions *SP compressed instructions. The SP
 // operand isn't explicitly encoded in the instruction.
 static void addImplySP(MCInst &Inst, int64_t Address, const void *Decoder) {

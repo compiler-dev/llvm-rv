@@ -48,7 +48,14 @@ RISCVRegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
     if (Subtarget.hasStdExtF())
       return CSR_XLEN_F32_Interrupt_SaveList;
     return CSR_Interrupt_SaveList;
+    if (Subtarget.hasStdExtV())
+      return CSR_XLEN_F32_VEC_Interrupt_SaveList;
+    return CSR_Interrupt_SaveList;
   }
+  
+  //we need to save the gpr,fpr and vpr when enable the feature "+v"
+  if(MF->getSubtarget<RISCVSubtarget>().hasStdExtV())
+  return CSR_ILP32F_LP64F_VEC_SaveList;
 
   switch (Subtarget.getTargetABI()) {
   default:
@@ -116,8 +123,12 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   unsigned FrameReg;
-  int Offset =
-      getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg) +
+  int Offset ;
+  if (MI.getOpcode() == RISCV::VSE_V_um || MI.getOpcode() == RISCV::VLE_V_um){
+	  Offset = getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg);
+  }
+  else
+      Offset = getFrameLowering(MF)->getFrameIndexReference(MF, FrameIndex, FrameReg) +
       MI.getOperand(FIOperandNum + 1).getImm();
 
   if (!isInt<32>(Offset)) {
@@ -142,9 +153,27 @@ void RISCVRegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
     FrameRegIsKill = true;
   }
 
+ if((Offset != 0) && (MI.getOpcode() == RISCV::VSE_V_um || MI.getOpcode() == RISCV::VLE_V_um))
+  {
+	unsigned ScratchReg = MRI.createVirtualRegister(&RISCV::GPRRegClass);
+	BuildMI(MBB, II, DL, TII->get(RISCV::ADDI),ScratchReg)
+		.addReg(FrameReg, RegState::Kill)
+		.addImm(Offset);
+	Offset = 0;
+	FrameReg = ScratchReg;
+	FrameRegIsKill = true;
+  }
+  
+ if(MI.getOpcode() == RISCV::VSE_V_um || MI.getOpcode() == RISCV::VLE_V_um)
+ {  
+  	MI.getOperand(FIOperandNum)
+      .ChangeToRegister(FrameReg, false, false, FrameRegIsKill);
+  }
+  else{
   MI.getOperand(FIOperandNum)
       .ChangeToRegister(FrameReg, false, false, FrameRegIsKill);
   MI.getOperand(FIOperandNum + 1).ChangeToImmediate(Offset);
+	}
 }
 
 Register RISCVRegisterInfo::getFrameRegister(const MachineFunction &MF) const {
@@ -156,6 +185,23 @@ const uint32_t *
 RISCVRegisterInfo::getCallPreservedMask(const MachineFunction & MF,
                                         CallingConv::ID /*CC*/) const {
   auto &Subtarget = MF.getSubtarget<RISCVSubtarget>();
+    if (MF.getFunction().hasFnAttribute("interrupt")) {
+    if (Subtarget.hasStdExtD())
+      return CSR_XLEN_F64_Interrupt_RegMask;
+    if (Subtarget.hasStdExtF())
+      return CSR_XLEN_F32_Interrupt_RegMask;
+    if (Subtarget.hasStdExtV())
+      return CSR_XLEN_F32_VEC_Interrupt_RegMask;
+    return CSR_Interrupt_RegMask;
+  }
+
+  //we need to save the gpr,fpr and vpr when enable the feature "+v"
+  if(MF.getSubtarget<RISCVSubtarget>().hasStdExtV())
+  return CSR_ILP32F_LP64F_VEC_RegMask;
+  
+  //only need to save the gpr and fpr when enable the featur "+f"
+  if (MF.getSubtarget<RISCVSubtarget>().hasStdExtF())
+  return CSR_ILP32F_LP64F_RegMask;
 
   switch (Subtarget.getTargetABI()) {
   default:

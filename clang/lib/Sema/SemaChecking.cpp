@@ -1662,6 +1662,10 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
         if (CheckPPCBuiltinFunctionCall(BuiltinID, TheCall))
           return ExprError();
         break;
+      case llvm::Triple::riscv32:
+				if (CheckRiscv32BuiltinFunctionCall(BuiltinID, TheCall))
+	 			 return ExprError();
+				break;
       default:
         break;
     }
@@ -1982,6 +1986,97 @@ bool Sema::CheckARMBuiltinFunctionCall(unsigned BuiltinID, CallExpr *TheCall) {
   case ARM::BI__builtin_arm_dbg:
     return SemaBuiltinConstantArgRange(TheCall, 0, 0, 15);
   }
+}
+
+bool Sema::CheckRiscv32BuiltinFunctionCall(unsigned BuiltinID,
+					CallExpr *TheCall) {
+
+  const char *TypeStr = Context.BuiltinInfo.getTypeString(BuiltinID);
+  char ch[5] = {'A','A','A','A','A'}; 
+  int i=0;
+  for (int j = 0; (j < 21) && (ch[4] != '_') ; j++){
+    switch (*TypeStr++)
+    {
+    default:
+    if (ch[4] == '_')
+    {
+      break;
+    }
+      i=0;
+      break;
+    case 'I':
+      if (i==0)
+      {
+        ch[0] = 'I';
+        i++;
+      }
+      break;
+    case 'S':
+      if (i==1)
+      {
+        ch[1] = 'S';
+        i++;
+      }
+      break;
+    case 'U':
+      if (i==1)
+      {
+        ch[1] = 'U';
+        i++;
+      }
+      break;
+    case 'i':
+      if (i==2)
+      {
+        ch[2] = 'i';
+        i++;
+      }
+      break;
+    case 'V':
+      if (i==3)
+      {
+        ch[3] = 'V';
+        i++;
+      }
+      break;
+    case '\000':
+      ch[4] = '_';
+      break;  
+    }
+  }
+
+  unsigned NumArgs = TheCall->getNumArgs();
+  llvm::APSInt Result;
+
+  if ((NumArgs == 2) && (ch[3] != 'V')) {
+    if(BuiltinID==RISCV::BI__builtin_riscv_vsetvli) {
+      return SemaBuiltinConstantArgRange(TheCall, 1, 0, 127); 
+    }
+    if ((ch[0] == 'I' ) && (ch[1] == 'S') && (ch[2] == 'i')) {
+      return SemaBuiltinConstantArgRange(TheCall, 1, -16, 15);
+    }
+    else if ((ch[0] == 'I' )&& (ch[1] == 'U') && (ch[2] == 'i')) {
+      return SemaBuiltinConstantArgRange(TheCall, 1, 0, 31);;
+    }
+  }
+  else if ((NumArgs == 3) && (ch[3] != 'V')) {
+    if ((ch[0] == 'I' ) && (ch[1] == 'S') && (ch[2] == 'i')) {
+      return SemaBuiltinConstantArgRange(TheCall, 2, -16, 15);
+    }
+    else if ((ch[0] == 'I' )&& (ch[1] == 'U') && (ch[2] == 'i')) {
+      return SemaBuiltinConstantArgRange(TheCall, 2, 0, 31);;
+    }
+  }
+  else if ((NumArgs == 3) && (ch[3] == 'V')) {
+    if ((ch[0] == 'I' ) && (ch[1] == 'S') && (ch[2] == 'i')) {
+      return SemaBuiltinConstantArgRange(TheCall, 1, -16, 15);
+    }
+    else if ((ch[0] == 'I' )&& (ch[1] == 'U') && (ch[2] == 'i')) {
+      return SemaBuiltinConstantArgRange(TheCall, 1, 0, 31);;
+    }
+  }
+
+  return false;
 }
 
 bool Sema::CheckAArch64BuiltinFunctionCall(unsigned BuiltinID,
