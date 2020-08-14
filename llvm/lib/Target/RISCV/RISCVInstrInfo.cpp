@@ -112,26 +112,22 @@ void RISCVInstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   // FPR->FPR copies
   unsigned Opc;
   if (RISCV::FPR32RegClass.contains(DstReg, SrcReg))
-    Opc = RISCV::FSGNJ_S;
+	  Opc = RISCV::FSGNJ_S;
   else if (RISCV::FPR64RegClass.contains(DstReg, SrcReg))
-    Opc = RISCV::FSGNJ_D;
-  else if (RISCV::VGRRegClass.contains(DstReg, SrcReg))
-	Opc = RISCV::VMV_V_V;
-  else if (RISCV::VPRRegClass.contains(DstReg, SrcReg))
-	Opc = RISCV::VMV_V_V;
-  else if (RISCV::VQRRegClass.contains(DstReg, SrcReg)) 
-	Opc = RISCV::VMV_V_V;
-  else if (RISCV::VORRegClass.contains(DstReg, SrcReg)) 
-	Opc = RISCV::VMV_V_V;
-  else if (RISCV::VMASKRegClass.contains(DstReg) && RISCV::VGRRegClass.contains(SrcReg))
+	  Opc = RISCV::FSGNJ_D;
+  else if (RISCV::VGRRegClass.contains(DstReg, SrcReg) ||
+		  RISCV::VPRRegClass.contains(DstReg, SrcReg) ||
+		  RISCV::VQRRegClass.contains(DstReg, SrcReg) ||
+		  RISCV::VORRegClass.contains(DstReg, SrcReg) || 
+		  (RISCV::VMASKRegClass.contains(DstReg) && RISCV::VGRRegClass.contains(SrcReg)))
   {
-	Opc = RISCV::VMV_V_V;
-    BuildMI(MBB, MBBI, DL, get(Opc), RISCV::V0)
-		.addReg(SrcReg, getKillRegState(KillSrc));
-	return;
+	  Opc = RISCV::VMV_V_V;
+	  BuildMI(MBB, MBBI, DL, get(Opc), RISCV::V0)
+		  .addReg(SrcReg, getKillRegState(KillSrc));
+	  return;
   }
   else
-    llvm_unreachable("Impossible reg-to-reg copy");
+	  llvm_unreachable("Impossible reg-to-reg copy");
 
   BuildMI(MBB, MBBI, DL, get(Opc), DstReg)
       .addReg(SrcReg, getKillRegState(KillSrc))
