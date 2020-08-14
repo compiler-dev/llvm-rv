@@ -1,6 +1,10 @@
-# RISC-V in LLVM and CLANG for Vector Extension
-This is the RISC-V Vector Extension in LLVM and CLANG implemented by Hunan Compiler Information Technology Co., Ltd,
-http://www.compiler-dev.com, Email: <info@compiler-dev.com>, according to Riscv-v-spec-0.8,with isa=rv32imafcv and vlen=128.
+# Full Support 32bit RISC-V in LLVM and CLANG for Vector Extension
+This is the RISC-V Vector Extension support in LLVM and CLANG implemented by Hunan Compiler Information Technology Co., Ltd
+(http://www.compiler-dev.com, Email: <info@compiler-dev.com>). So far the compiler has been compatible with the Riscv-v-spec-0.8.
+Please add isa=rv32imafcv and vlen=128 options to the command line as compiling source codes.
+
+This implementation includes Clang C/C++ compiler, llvm-mc assembler, and llvm-objdump disassembler. The RISC-V Vector
+Extension module is fully supported using more than 6000 intrinsic interfaces.
 
 The README briefly describes how to get started with building LLVM and CLANG, and how to run
 a rvv test in spike on a linux x86 machine as an example.
@@ -12,9 +16,8 @@ emulator, the SPIKE is also needed. We provide these pre-compiled binaries for l
 
 https://github.com/compiler-dev/rvvtool-chain-binaries
 
-We support that the path of the rvvtool-chain-binaries is TOOL_CHAIN_PATH.
-
-You could also build these tools from the source codes by the following steps.
+You could also build these tools from the source codes by the following steps. 
+Suppose that the path of the rvvtool-chain-binaries is TOOL_CHAIN_PATH.
 
 1. Build riscv-gnu-toolchain
 * $ git clone https://github.com/riscv/riscv-gnu-toolchain
@@ -56,7 +59,7 @@ You could also build these tools from the source codes by the following steps.
 
 ## How to run a rvv test vadd_vv_i32.c in SPIKE  
 * $ export PATH=$TOOL_CHAIN_PATH/bin:$PATH  
-* $ cd llvm-rv/rvv-test  
+* $ cd llvm-rv/rvv-test
 * $ clang vadd_vv_i32.c -O2 --target=riscv32 -march=rv32imafcv -std=gnu99 -Wa,-march=rv32imafcv \
 	TOOL_CHAIN_PATH/riscv32-unknown-elf/lib/crt0.o -L$TOOL_CHAIN_PATH/riscv32-unknown-elf/lib \
 	-L$TOOL_CHAIN_PATH/lib/gcc/riscv32-unknown-elf/10.0.1 -nostartfiles -Wl, -lc -lgcc -lm -lsim -Wl, \
@@ -72,5 +75,5 @@ You could also build these tools from the source codes by the following steps.
 
 #Note
 In the rvv-test directory, there are two directories besides three testcases which could be run in SPIKE. 
-* intrinsic: Intrinsics API test cases which are all for compiling.
-* KmplIntrinsicAPI: Documents for intrinsics API. You could begin with riscv_vector.h.html	
+* intrinsic: Intrinsic APIs test cases.
+* KmplIntrinsicAPI: Documents for more than 6,000 intrinsic APIs. You could begin with riscv_vector.h.html.	
