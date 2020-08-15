@@ -509,14 +509,14 @@ let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in{
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Constraints = "$vs3 = $vd" in{
 	multiclass VALU_OPMVV_MulAdd<bits<6> funct6,string opcodestr>{
 	def _m : RVInstVA<funct6,0b010,OPC_VOP,(outs VReg:$vd),
-			(ins VMASK:$vm, VReg:$vs3, VReg:$vs1, VReg:$vs2),opcodestr,"$vd, $vs2, $vs1, $vm">,Sched<[]>{
+			(ins VMASK:$vm, VReg:$vs3, VReg:$vs1, VReg:$vs2),opcodestr,"$vd, $vs1, $vs2, $vm">,Sched<[]>{
 			bits<5> vs1;
 			bits<1> vm;
 			let Inst{25} = vm;
 			let Inst{19-15} = vs1;
 			}
 	def _um : RVInstVA<funct6,0b010,OPC_VOP,(outs VReg:$vd),
-			(ins VReg:$vs3, VReg:$vs1, VReg:$vs2),opcodestr,"$vd, $vs2, $vs1">,Sched<[]>{
+			(ins VReg:$vs3, VReg:$vs1, VReg:$vs2),opcodestr,"$vd, $vs1, $vs2">,Sched<[]>{
 			bits<5> vs1;
 			let Inst{25} = 0b1;
 			let Inst{19-15} = vs1;
@@ -528,14 +528,14 @@ let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Constraints = "$vs3 = $vd" in
 let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Constraints = "$vs3 = $vd" in{
 	multiclass VALU_OPMVX_MulAdd<bits<6> funct6,string opcodestr>{
 	def _m : RVInstVA<funct6,0b110,OPC_VOP,(outs VReg:$vd),
-			(ins VMASK:$vm, VReg:$vs3, GPR:$rs1, VReg:$vs2),opcodestr,"$vd, $vs2, $rs1, $vm">,Sched<[]>{
+			(ins VMASK:$vm, VReg:$vs3, GPR:$rs1, VReg:$vs2),opcodestr,"$vd, $rs1, $vs2, $vm">,Sched<[]>{
 			bits<5> rs1;
 			bits<1> vm;
 			let Inst{25} = vm;
 			let Inst{19-15} = rs1;
 			}
 	def _um : RVInstVA<funct6,0b110,OPC_VOP,(outs VReg:$vd),
-			(ins VReg:$vs3, GPR:$rs1, VReg:$vs2),opcodestr,"$vd, $vs2, $rs1">,Sched<[]>{
+			(ins VReg:$vs3, GPR:$rs1, VReg:$vs2),opcodestr,"$vd, $rs1, $vs2">,Sched<[]>{
 			bits<5> rs1;
 			let Inst{25} = 0b1;
 			let Inst{19-15} = rs1;
