@@ -6823,17 +6823,17 @@ def : PatVgr<int_riscv_vfirst_m,VFIRST_M_um,v16i8>;
 def : PatVmVgr<int_riscv_vfirst_m_m,VFIRST_M_m,v16i8>;
 
 /*************Vector set-before-first mask bit Functions****************/
-defm VMSBF_M : VALU_OPMVV_VMUNARY<0b010000,0b00001,"vmsbf.m">;
+defm VMSBF_M : VALU_OPMVV_VMUNARY<0b010100,0b00001,"vmsbf.m">;
 def : PatVgr<int_riscv_vmsbf_m,VMSBF_M_um,v16i8>;
 def : PatVmVgr<int_riscv_vmsbf_m_m,VMSBF_M_m,v16i8>;
 
 /*************Vector set-including-first mask bit Functions****************/
-defm VMSIF_M : VALU_OPMVV_VMUNARY<0b010000,0b00011,"vmsif.m">;
+defm VMSIF_M : VALU_OPMVV_VMUNARY<0b010100,0b00011,"vmsif.m">;
 def : PatVgr<int_riscv_vmsif_m,VMSIF_M_um,v16i8>;
 def : PatVmVgr<int_riscv_vmsif_m_m,VMSIF_M_m,v16i8>;
 
 /*************Vector set-only-first mask bit Functions****************/
-defm VMSOF_M : VALU_OPMVV_VMUNARY<0b010000,0b00010,"vmsof.m">;
+defm VMSOF_M : VALU_OPMVV_VMUNARY<0b010100,0b00010,"vmsof.m">;
 def : PatVgr<int_riscv_vmsof_m,VMSOF_M_um,v16i8>;
 def : PatVmVgr<int_riscv_vmsof_m_m,VMSOF_M_m,v16i8>;
 
