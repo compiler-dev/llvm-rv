@@ -60,10 +60,8 @@ Suppose that the path of the rvvtool-chain-binaries is TOOL_CHAIN_PATH.
 ## How to run a rvv test vadd_vv_i32.c in SPIKE  
 * $ export PATH=$TOOL_CHAIN_PATH/bin:$PATH  
 * $ cd llvm-rv/rvv-test
-* $ clang vadd_vv_i32.c -O2 --target=riscv32 -march=rv32imafcv -std=gnu99 -Wa,-march=rv32imafcv \
-	TOOL_CHAIN_PATH/riscv32-unknown-elf/lib/crt0.o -L$TOOL_CHAIN_PATH/riscv32-unknown-elf/lib \
-	-L$TOOL_CHAIN_PATH/lib/gcc/riscv32-unknown-elf/10.0.1 -nostartfiles -Wl, -lc -lgcc -lm -lsim -Wl, \
-	-o vadd_vv_i32.out --rtlib=libgcc  
+* $ clang vadd_vv_i32.c -O2 --target=riscv32 -march=rv32imafcv --sysroot=$TOOL_CHAIN_PATH/riscv-unknown-elf \
+	--gcc-toolchain=$TOOL_CHAIN_PATH -o vadd_vv_i32.out  
 * $ spike $TOOL_CHAIN_PATH/riscv32-unknown-elf/bin/pk ./vadd_vv_i32.out
 
 * Output:  
@@ -72,6 +70,17 @@ Suppose that the path of the rvvtool-chain-binaries is TOOL_CHAIN_PATH.
 	Actual:  
 	{0x7fffffff,0x80000001,0x80000003,0x80000005}  
 	pass!  
+
+If the program uses the floating-point instructions, the FPU should be enabled by replacing some files in the rvvtool-chain-binaries.
+
+* $ cp -r $TOOL_CHAIN_PATH/enable-fp/usr $TOOL_CHAIN_PATH/
+
+The following example comes from RISC-V Vector Extension Intrinsic Document (https://github.com/riscv/rvv-intrinsic-doc).
+
+* $ clang rvv_sgemm.c -O2 --target=riscv32 -march=rv32imafcv --sysroot=$TOOL_CHAIN_PATH/riscv32-unknown-elf 
+	--gcc-toolchain=$TOOL_CHAIN_PATH -nodefaultlibs -Wl,--start-group -lc -lgcc -lm -lsim -Wl, --end-group \
+	-T $TOOL_CHAIN_PATH/bin/link.ld -o rvv_sgemm.out
+* $ spike -m0x10000000:0x200000 ./rvv_sgemm.out
 
 #Note
 In the rvv-test directory, there are two directories besides three testcases which could be run in SPIKE. 
