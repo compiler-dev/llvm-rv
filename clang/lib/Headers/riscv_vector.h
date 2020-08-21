@@ -36,6 +36,7 @@ typedef __attribute__((riscv_vector_type(8))) uint16_t vuint16m1_t;
 typedef __attribute__((riscv_vector_type(4))) int32_t vint32m1_t;
 typedef __attribute__((riscv_vector_type(4))) uint32_t vuint32m1_t;
 typedef __attribute__((riscv_vector_type(4))) float32_t vfloat32m1_t;
+typedef __attribute__((riscv_vector_type(32))) float32_t vfloat32m8_t;
 
 //mask
 typedef __attribute__((riscv_vector_type(16))) uint8_t vmask_t;
@@ -80,16 +81,20 @@ __rv32 uint32_t vsetvl(uint32_t avl, uint32_t vtypei){
 	return __ret;
 }
 
-uint32_t vsetvl_e32m1(uint32_t avl){
+__rv32 uint32_t vsetvl_e32m1(uint32_t avl){
 	return vsetvli(avl,RVV_E32,RVV_M1,RVV_D1);
 }
 
-uint32_t vsetvl_e16m1(uint32_t avl){
+__rv32 uint32_t vsetvl_e16m1(uint32_t avl){
 	return vsetvli(avl,RVV_E16,RVV_M1,RVV_D1);
 }
 
-uint32_t vsetvl_e8m1(uint32_t avl){
+__rv32 uint32_t vsetvl_e8m1(uint32_t avl){
 	return vsetvli(avl,RVV_E8,RVV_M1,RVV_D1);
+}
+
+__rv32 uint32_t vsetvl_e32m8(uint32_t avl){
+	return vsetvli(avl,RVV_E32,RVV_M8,RVV_D1);
 }
 
 /*************Vector Unit-Stride Load Functions***************/
@@ -119,6 +124,10 @@ __rv32 vuint32m1_t vle_v_u32m1(const uint32_t *base){
 
 __rv32 vfloat32m1_t vle_v_f32m1(const float32_t *base){
 	return __builtin_riscv_vle_v_f32m1(base);
+}
+
+__rv32 vfloat32m8_t vle_v_f32m8(const float32_t *base){
+	return __builtin_riscv_vle_v_f32m8(base);
 }
 
 //masked functions
@@ -151,60 +160,64 @@ __rv32 vfloat32m1_t vle_v_f32m1_m(vmask_t mask, const float32_t *base){
 }
 
 /*************Vector Unit-Stride Store Functions***************/
-__rv32 void vse_v_i8m1(vint8m1_t value,int8_t *base){
+__rv32 void vse_v_i8m1(int8_t *base, vint8m1_t value){
 	__builtin_riscv_vse_v_i8m1(value,base);
 }
 
-__rv32 void vse_v_i16m1(vint16m1_t value, int16_t *base){
+__rv32 void vse_v_i16m1(int16_t *base, vint16m1_t value){
 	__builtin_riscv_vse_v_i16m1(value,base);
 }
 
-__rv32 void vse_v_i32m1(vint32m1_t value, int32_t *base){
+__rv32 void vse_v_i32m1(int32_t *base, vint32m1_t value){
 	__builtin_riscv_vse_v_i32m1(value,base);
 }
 
-__rv32 void vse_v_u8m1(vuint8m1_t value, uint8_t *base){
+__rv32 void vse_v_u8m1(uint8_t *base, vuint8m1_t value){
 	__builtin_riscv_vse_v_u8m1(value,base);
 }
 
-__rv32 void vse_v_u16m1(vuint16m1_t value, uint16_t *base){
+__rv32 void vse_v_u16m1(uint16_t *base, vuint16m1_t value){
 	__builtin_riscv_vse_v_u16m1(value,base);
 }
 
-__rv32 void vse_v_u32m1(vuint32m1_t value, uint32_t *base){
+__rv32 void vse_v_u32m1(uint32_t *base, vuint32m1_t value){
 	__builtin_riscv_vse_v_u32m1(value,base);
 }
 
-__rv32 void vse_v_f32m1(vfloat32m1_t value, float32_t *base){
+__rv32 void vse_v_f32m1(float32_t *base, vfloat32m1_t value){
 	__builtin_riscv_vse_v_f32m1(value,base);
 }
 
+__rv32 void vse_v_f32m8(float32_t *base, vfloat32m8_t value){
+	__builtin_riscv_vse_v_f32m8(value,base);
+}
+
 //masked functions
-__rv32 void vse_v_i8m1_m(vmask_t mask,vint8m1_t value, int8_t *base){
+__rv32 void vse_v_i8m1_m(vmask_t mask, int8_t *base, vint8m1_t value){
 	__builtin_riscv_vse_v_i8m1_m(mask,value,base);
 }
 
-__rv32 void vse_v_i16m1_m(vmask_t mask,vint16m1_t value, int16_t *base){
+__rv32 void vse_v_i16m1_m(vmask_t mask, int16_t *base, vint16m1_t value){
 	__builtin_riscv_vse_v_i16m1_m(mask,value,base);
 }
 
-__rv32 void vse_v_i32m1_m(vmask_t mask,vint32m1_t value, int32_t *base){
+__rv32 void vse_v_i32m1_m(vmask_t mask,int32_t *base, vint32m1_t value){
 	__builtin_riscv_vse_v_i32m1_m(mask,value,base);
 }
 
-__rv32 void vse_v_u8m1_m(vmask_t mask,vuint8m1_t value, uint8_t *base){
+__rv32 void vse_v_u8m1_m(vmask_t mask, uint8_t *base, vuint8m1_t value){
 	__builtin_riscv_vse_v_u8m1_m(mask,value,base);
 }
 
-__rv32 void vse_v_u16m1_m(vmask_t mask,vuint16m1_t value, uint16_t *base){
+__rv32 void vse_v_u16m1_m(vmask_t mask, uint16_t *base, vuint16m1_t value){
 	__builtin_riscv_vse_v_u16m1_m(mask,value,base);
 }
 
-__rv32 void vse_v_u32m1_m(vmask_t mask,vuint32m1_t value, uint32_t *base){
+__rv32 void vse_v_u32m1_m(vmask_t mask, uint32_t *base, vuint32m1_t value){
 	__builtin_riscv_vse_v_u32m1_m(mask,value,base);
 }
 
-__rv32 void vse_v_f32m1_m(vmask_t mask,vfloat32m1_t value, float32_t *base){
+__rv32 void vse_v_f32m1_m(vmask_t mask, float32_t *base, vfloat32m1_t value){
 	__builtin_riscv_vse_v_f32m1_m(mask,value,base);
 }
 
@@ -4661,6 +4674,10 @@ __rv32 vfloat32m1_t vfmacc_vv_f32m1(vfloat32m1_t acc, vfloat32m1_t op1, vfloat32
 
 __rv32 vfloat32m1_t vfmacc_vf_f32m1(vfloat32m1_t acc, float32_t op1, vfloat32m1_t op2){
 	return __builtin_riscv_vfmacc_vf_f32m1(acc,op1,op2);
+}
+
+__rv32 vfloat32m8_t vfmacc_vf_f32m8(vfloat32m8_t acc, float32_t op1, vfloat32m8_t op2){
+	return __builtin_riscv_vfmacc_vf_f32m8(acc,op1,op2);
 }
 
 __rv32 vfloat32m1_t vfnmacc_vv_f32m1(vfloat32m1_t acc, vfloat32m1_t op1, vfloat32m1_t op2){
