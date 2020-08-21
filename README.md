@@ -75,9 +75,9 @@ If the program uses the floating-point instructions, the FPU should be enabled b
 
 * $ cp -r $TOOL_CHAIN_PATH/enable-fp/usr $TOOL_CHAIN_PATH/
 
-The following example comes from RISC-V Vector Extension Intrinsic Document (https://github.com/riscv/rvv-intrinsic-doc).
+The following example comes from RISC-V Vector Extension Intrinsic Document (https://github.com/riscv/rvv-intrinsic-doc) with minor changes conforming to Riscv-v-spec-0.8.
 
-* $ clang rvv_sgemm.c -O2 --target=riscv32 -march=rv32imafcv --sysroot=$TOOL_CHAIN_PATH/riscv32-unknown-elf 
+* $ clang llvm-rv/rvv-test/rvv_sgemm.c -O2 --target=riscv32 -march=rv32imafcv --sysroot=$TOOL_CHAIN_PATH/riscv32-unknown-elf 
 	--gcc-toolchain=$TOOL_CHAIN_PATH -nodefaultlibs -Wl,--start-group -lc -lgcc -lm -lsim -Wl, --end-group \
 	-T $TOOL_CHAIN_PATH/bin/link.ld -o rvv_sgemm.out
 * $ spike -m0x10000000:0x200000 ./rvv_sgemm.out
