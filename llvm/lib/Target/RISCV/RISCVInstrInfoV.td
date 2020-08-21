@@ -4602,7 +4602,7 @@ def : PatVmWidVgrGprVgr<int_riscv_vqmaccus_vx_32m8_m,VQMACCUS_VX_m,v32i32,v32i8>
 
 //defm VMERGE_VVM : VALU_OPIVV<0b010111,"vmerge.vvm">;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VMERGE_VVM : RVInstVA<0b010111, 0b000, OPC_VOP,
                (outs VReg:$vd), (ins VMASK:$vm, VReg:$vs2, VReg:$vs1),
                "vmerge.vvm", "$vd, $vs2, $vs1, $vm">,Sched<[]>{
@@ -4629,7 +4629,7 @@ def : PatVmVgrVgr<int_riscv_vmerge_vvm_32m8_m,VMERGE_VVM,v32i32>;
 
 //defm VMERGE_VXM : VALU_OPIVX<0b010111,"vmerge.vxm">;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VMERGE_VXM : RVInstVA<0b010111, 0b100, OPC_VOP,
                (outs VReg:$vd), (ins VMASK:$vm, VReg:$vs2, GPR:$rs1),
                "vmerge.vxm", "$vd, $vs2, $rs1, $vm">,Sched<[]>{
@@ -4656,7 +4656,7 @@ def : PatVmVgrGpr<int_riscv_vmerge_vxm_32m8_m,VMERGE_VXM,v32i32>;
 
 //defm VMERGE_VIM : VALU_OPIVI_signed<0b010111,0b011,"vmerge.vim">;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VMERGE_VIM : RVInstVA<0b010111, 0b011, OPC_VOP,
                (outs VReg:$vd), (ins VMASK:$vm, VReg:$vs2, simm5:$simm),
                "vmerge.vim", "$vd, $vs2, $simm, $vm">,Sched<[]>{
@@ -4682,7 +4682,7 @@ def : PatVmVgrSimm5<int_riscv_vmerge_vim_32m4_m,VMERGE_VIM,v16i32>;
 def : PatVmVgrSimm5<int_riscv_vmerge_vim_32m8_m,VMERGE_VIM,v32i32>;
 
 /***********Vector Integer Move Functions************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in{
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in{
 def VMV_V_V : RVInstVA<0b010111, 0b000, OPC_VOP,
                (outs VReg:$vd), (ins VReg:$vs1),
                "vmv.v.v", "$vd, $vs1">,Sched<[]> {
@@ -4708,7 +4708,7 @@ def : PatVgr<int_riscv_vmv_v_v_32m2,VMV_V_V,v8i32>;
 def : PatVgr<int_riscv_vmv_v_v_32m4,VMV_V_V,v16i32>;
 def : PatVgr<int_riscv_vmv_v_v_32m8,VMV_V_V,v32i32>;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in{
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in{
 def VMV_V_X : RVInstVA<0b010111, 0b100, OPC_VOP,
                (outs VReg:$vd), (ins GPR:$rs1),
                "vmv.v.x", "$vd, $rs1">,Sched<[]> {
@@ -4734,7 +4734,7 @@ def : PatGpr<int_riscv_vmv_v_x_32m2,VMV_V_X>;
 def : PatGpr<int_riscv_vmv_v_x_32m4,VMV_V_X>;
 def : PatGpr<int_riscv_vmv_v_x_32m8,VMV_V_X>;
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in{
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in{
 def VMV_V_I : RVInstVA<0b010111, 0b011, OPC_VOP,
                (outs VReg:$vd), (ins simm5:$simm),
                "vmv.v.i", "$vd, $simm">,Sched<[]> {
@@ -6308,7 +6308,7 @@ def : PatVmVgr<int_riscv_vfclass_v_f32m4_m,VFCLASS_V_m,v16f32>;
 def : PatVmVgr<int_riscv_vfclass_v_f32m8_m,VFCLASS_V_m,v32f32>;
 
 /*************Vector Floating-Point Merge Functions****************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VFMERGE_VFM : RVInstVA<0b010111, 0b101, OPC_VOP,
                (outs VReg:$vd), (ins VMASK:$vm, VReg:$vs2, FPR32:$rs1),
                "vfmerge.vfm", "$vd, $vs2, $rs1, $vm">,Sched<[]>{
@@ -6325,7 +6325,7 @@ def : PatVmVgrFloat<int_riscv_vfmerge_vfm_f32m8,VFMERGE_VFM,v32f32>;
 
 
 /*************Vector Floating-Point Move Functions****************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VFMV_V_F : RVInstVA<0b010111, 0b101, OPC_VOP,
                (outs VReg:$vd), (ins FPR32:$rs1),
                "vfmv.v.f", "$vd, $rs1">,Sched<[]>{
@@ -6776,7 +6776,7 @@ def : PatVmVgrVgr<int_riscv_vfredmin_vs_f32m4_m,VFREDMIN_VS_m,v16f32>;
 def : PatVmVgrVgr<int_riscv_vfredmin_vs_f32m8_m,VFREDMIN_VS_m,v32f32>;
 
 /*************Vector Mask-Register Logical Functions****************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in{
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in{
 class VALU_OPMVV_NOVM<bits<6> funct6,string opcodestr>
 		: RVInstVA<funct6,0b010,OPC_VOP,(outs VReg:$vd),
 		  (ins VReg:$vs2, VReg:$vs1),opcodestr,"$vd, $vs2, $vs1">,Sched<[]>{
@@ -6876,7 +6876,7 @@ def : Pat<(int_riscv_vid_v_u32m4_m VMASK:$vm),(VID_V_m VMASK:$vm)>;
 def : Pat<(int_riscv_vid_v_u32m8_m VMASK:$vm),(VID_V_m VMASK:$vm)>;
 
 /*************Vector Integer Scalar Move Instructions********************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VMV_X_S : RVInstVA<0b010000, 0b010, OPC_VOP,
 			  (outs GPR:$rd), (ins VReg:$vs2),
 			  "vmv.x.s", "$rd, $vs2">,Sched<[]>{
@@ -6884,7 +6884,7 @@ def VMV_X_S : RVInstVA<0b010000, 0b010, OPC_VOP,
   let Inst{19-15} = 0b00000;
 }
 
-let hasSideEffects = 0, mayLoad = 0, mayStore =0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore =0, Uses = [VL] in
 def VMV_S_X : RVInstVA<0b010000, 0b110, OPC_VOP,
 			  (outs VReg:$vd), (ins GPR:$rs1),
 			  "vmv.s.x", "$vd, $rs1">,Sched<[]>{
@@ -6925,7 +6925,7 @@ def : PatGpr<int_riscv_vmv_s_x_32m4,VMV_S_X>;
 def : PatGpr<int_riscv_vmv_s_x_32m8,VMV_S_X>;
 
 /*************Vector Floating-Point Scalar Move Functions****************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VFMV_F_S : RVInstVAR<0b010000, 0b001, OPC_VOP,
                (outs FPR32:$rd), (ins VReg:$vs2),
                "vfmv.f.s", "$rd, $vs2">,Sched<[]>{
@@ -6934,7 +6934,7 @@ def VFMV_F_S : RVInstVAR<0b010000, 0b001, OPC_VOP,
   let Inst{19-15} = 0b00000;
 }
 
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VFMV_S_F : RVInstVA<0b010000, 0b101, OPC_VOP,
                (outs VReg:$vd), (ins FPR32:$rs1),
                "vfmv.s.f", "$vd, $rs1">,Sched<[]>{
@@ -7342,7 +7342,7 @@ def : PatVmVgrUimm5<int_riscv_vrgather_vi_f32m8_m,VRGATHER_VI_m,v32f32>;
 
 
 /*************Vector Compress Instruction****************/
-let hasSideEffects = 0, mayLoad = 0, mayStore = 0 in
+let hasSideEffects = 0, mayLoad = 0, mayStore = 0, Uses = [VL] in
 def VCOMPRESS_VM : RVInstVA<0b010111, 0b010, OPC_VOP,
                (outs VReg:$vd), (ins VReg:$vs1, VReg:$vs2),
                "vcompress.vm", "$vd, $vs2, $vs1">,Sched<[]>{
