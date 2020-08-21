@@ -152,3 +152,5 @@ let RegAltNameIndices = [ABIRegAltName] in
 def V0T : RISCVReg32<0, "v0.t", ["v0.t"]>, DwarfRegNum<[0]>;
 def VMASK : RegisterClass<"RISCV", [v16i8], 128, (add V0T)>;
 
+let RegAltNameIndices = [ABIRegAltName] in
+def VL : RISCVReg32<0, "vl", ["vl"]>;
