@@ -1,13 +1,13 @@
 #include "riscv_vector.h"
-void test_vse_v_i32m1(vint32m1_t value, int32_t *base){
-	vse_v_i32m1(value,base);
+void test_vse_v_i32m1(int32_t *base, vint32m1_t value){
+	vse_v_i32m1(base,value);
 }
- void test_vse_v_i32m2(vint32m2_t value, int32_t *base){
-	vse_v_i32m2(value,base);
+ void test_vse_v_i32m2(int32_t *base, vint32m2_t value){
+	vse_v_i32m2(base,value);
 }
- void test_vse_v_i32m4(vint32m4_t value, int32_t *base){
-	vse_v_i32m4(value,base);
+ void test_vse_v_i32m4(int32_t *base, vint32m4_t value){
+	vse_v_i32m4(base,value);
 }
- void test_vse_v_i32m8(vint32m8_t value, int32_t *base){
-	vse_v_i32m8(value,base);
+ void test_vse_v_i32m8(int32_t *base, vint32m8_t value){
+	vse_v_i32m8(base,value);
 }

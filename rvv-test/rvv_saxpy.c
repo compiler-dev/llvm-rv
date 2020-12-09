@@ -44,7 +44,7 @@ float output[N] = {
     0.2484350696132857};
 
 void saxpy_golden(size_t n, const float a, const float *x, float *y) {
-  for (size_t i; i < n; ++i) {
+  for (size_t i = 0; i < n; ++i) {
     y[i] = a * x[i] + y[i];
   }
 }
